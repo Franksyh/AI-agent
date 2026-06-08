@@ -1,0 +1,13 @@
+{
+  "facts": {},
+  "notes": [],
+  "tasks": [],
+  "history": [
+    {
+      "time": "2026-06-07 16:46:38",
+      "input": "help",
+      "intent": "help",
+      "summary": "可用指令：\n- 目標：幫我做一個 AI agent\n- 記住 名字 = Frank\n- 回想 名字\n- 筆記 今天完成了 agent 雛形\n- 顯示筆記\n- 待辦 新增 測試計算功能\n- 待辦\n- 完成 1\n- 下一步\n- 計算 (12 + 8) * 3\n- 現在幾點\n- exit"
+    }
+  ]
+}
