@@ -62,7 +62,8 @@ button svg {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -79,6 +80,7 @@ textarea {
 
 input:focus,
 textarea:focus,
+select:focus,
 button:focus-visible {
   border-color: var(--blue);
   outline: 3px solid rgba(34, 92, 159, 0.25);
@@ -410,6 +412,12 @@ h3 {
   gap: 18px;
 }
 
+.remote-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 18px;
+}
+
 .tool-section {
   display: grid;
   gap: 16px;
@@ -420,8 +428,22 @@ h3 {
   grid-column: 1 / -1;
 }
 
+.status-badge {
+  min-height: 32px;
+  border: 1px solid rgba(36, 122, 90, 0.28);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--green);
+  background: rgba(36, 122, 90, 0.08);
+  font-weight: 700;
+}
+
 .goal-form,
-.button-row {
+.button-row,
+.join-row,
+.remote-command-row {
   display: flex;
   gap: 10px;
 }
@@ -432,6 +454,149 @@ h3 {
 
 .goal-form button {
   white-space: nowrap;
+}
+
+.remote-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.remote-controls label {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.join-row {
+  align-items: stretch;
+}
+
+.join-row input {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.session-card {
+  min-height: 92px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--surface-soft);
+}
+
+.session-card span,
+.qr-panel span {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.session-card strong {
+  font-size: 34px;
+  letter-spacing: 0.14em;
+}
+
+.qr-panel {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  background: #fff;
+}
+
+.qr-panel img {
+  width: 180px;
+  height: 180px;
+  border-radius: var(--radius);
+}
+
+.qr-panel img[hidden] {
+  display: none;
+}
+
+.qr-panel p {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.device-list {
+  display: grid;
+  gap: 10px;
+}
+
+.device-item {
+  min-height: 68px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  background: #fff;
+}
+
+.device-item svg {
+  width: 24px;
+  height: 24px;
+  color: var(--blue);
+}
+
+.device-item strong,
+.device-item small {
+  display: block;
+}
+
+.device-item small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.remote-command-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.event-log {
+  min-height: 240px;
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  background: var(--surface-soft);
+}
+
+.event-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  background: #fff;
+}
+
+.event-item span {
+  overflow-wrap: anywhere;
+}
+
+.event-item small {
+  color: var(--muted);
 }
 
 .plan-board {
@@ -620,7 +785,8 @@ h3 {
 @media (max-width: 1120px) {
   .overview-layout,
   .tool-grid,
-  .plan-board {
+  .plan-board,
+  .remote-layout {
     grid-template-columns: 1fr;
   }
 
@@ -668,12 +834,31 @@ h3 {
   }
 
   .composer,
-  .goal-form {
+  .goal-form,
+  .remote-controls,
+  .join-row,
+  .remote-command-row,
+  .qr-panel {
     grid-template-columns: 1fr;
     display: grid;
   }
 
-  .send-button {
+  .send-button,
+  .remote-controls button,
+  .join-row button,
+  .remote-command-row button {
     width: 100%;
+  }
+
+  .session-card {
+    align-items: flex-start;
+  }
+
+  .session-card strong {
+    font-size: 28px;
+  }
+
+  .event-item {
+    grid-template-columns: 1fr;
   }
 }

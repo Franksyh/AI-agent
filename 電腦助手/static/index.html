@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Future Assistant 是一個展示 AI Agent 工作流程、任務規劃與自動化能力的互動式工作台。"
+      content="Future Assistant 是支援手機版、電腦版與網頁版遠端連線的動態 AI Agent 工作台。"
     />
-    <title>Future Assistant | AI Agent 工作台</title>
+    <title>Future Assistant | 遠端 AI Agent 工作台</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="/app.js" defer></script>
@@ -17,6 +17,9 @@
       <aside class="side-rail" aria-label="主要功能">
         <button class="rail-button active" data-route="overview" title="工作台">
           <i data-lucide="layout-dashboard"></i>
+        </button>
+        <button class="rail-button" data-route="remote" title="遠端連線">
+          <i data-lucide="radio-tower"></i>
         </button>
         <button class="rail-button" data-route="planner" title="任務規劃">
           <i data-lucide="list-checks"></i>
@@ -36,7 +39,7 @@
         <header class="topbar">
           <div class="brand-block">
             <p class="eyebrow">Future Assistant</p>
-            <h1>AI Agent 工作台</h1>
+            <h1>遠端 AI Agent 工作台</h1>
           </div>
           <div class="status-strip" aria-live="polite">
             <span id="connectionDot" class="dot"></span>
@@ -64,7 +67,7 @@
                 <textarea
                   id="promptInput"
                   rows="2"
-                  placeholder="例如：幫我整理 AI Agent 產品介紹，產生發布到 GitHub 與 Netlify 的工作流程"
+                  placeholder="例如：讓手機連到電腦版 Agent，遠端傳送指令並同步狀態"
                 ></textarea>
                 <button class="send-button" type="submit" title="送出">
                   <i data-lucide="send"></i>
@@ -101,6 +104,10 @@
               </div>
 
               <div class="quick-actions" aria-label="快速任務">
+                <button data-intent="remote">
+                  <i data-lucide="radio-tower"></i>
+                  <span>遠端連線</span>
+                </button>
                 <button data-intent="github-netlify">
                   <i data-lucide="rocket"></i>
                   <span>發布網站</span>
@@ -113,54 +120,142 @@
                   <i data-lucide="file-text"></i>
                   <span>摘要文件</span>
                 </button>
-                <button data-intent="support">
-                  <i data-lucide="messages-square"></i>
-                  <span>客服回覆</span>
-                </button>
               </div>
             </aside>
           </div>
 
           <section class="metrics-row" aria-label="產品狀態">
             <article class="metric-card">
+              <span>網站模式</span>
+              <strong id="apiModeMetric">Dynamic</strong>
+              <small>Netlify Functions</small>
+            </article>
+            <article class="metric-card">
+              <span>遠端 Session</span>
+              <strong id="remoteMetric">0</strong>
+              <small>已連線裝置</small>
+            </article>
+            <article class="metric-card">
               <span>任務拆解</span>
               <strong id="planCount">0</strong>
               <small>待辦步驟</small>
-            </article>
-            <article class="metric-card">
-              <span>部署狀態</span>
-              <strong>Ready</strong>
-              <small>GitHub + Netlify</small>
-            </article>
-            <article class="metric-card">
-              <span>安全策略</span>
-              <strong id="safetyMetric">Confirm</strong>
-              <small>預設人工確認</small>
             </article>
           </section>
 
           <section class="capability-grid" aria-label="Agent 能力">
             <article class="capability-card">
-              <i data-lucide="brain-circuit"></i>
-              <h3>理解目標</h3>
-              <p>把自然語言轉成可執行的工作目標、限制與交付物。</p>
+              <i data-lucide="smartphone"></i>
+              <h3>手機版</h3>
+              <p>用配對碼或 QR code 加入 session，傳送文字指令與檢查狀態。</p>
             </article>
             <article class="capability-card">
-              <i data-lucide="route"></i>
-              <h3>規劃步驟</h3>
-              <p>自動拆成階段、檢查點與可交付成果。</p>
+              <i data-lucide="monitor"></i>
+              <h3>電腦版</h3>
+              <p>建立主控 session，保留人工確認點，接收遠端指令佇列。</p>
             </article>
             <article class="capability-card">
-              <i data-lucide="plug"></i>
-              <h3>串接工具</h3>
-              <p>支援 GitHub、Netlify、檔案處理與瀏覽器功能。</p>
+              <i data-lucide="globe-2"></i>
+              <h3>網頁版</h3>
+              <p>任何瀏覽器都可加入同一個遠端工作台，不需要安裝 app。</p>
             </article>
             <article class="capability-card">
               <i data-lucide="shield-check"></i>
-              <h3>安全執行</h3>
-              <p>依風險切換觀察、確認與執行模式。</p>
+              <h3>安全連線</h3>
+              <p>每台裝置有自己的 token，session 可關閉，訊息透過後端保存。</p>
             </article>
           </section>
+        </section>
+
+        <section class="view" data-view="remote">
+          <div class="remote-layout">
+            <section class="tool-section">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">遠端連線</p>
+                  <h2>建立或加入 Session</h2>
+                </div>
+                <span id="remoteStatusBadge" class="status-badge">未連線</span>
+              </div>
+
+              <div class="remote-controls">
+                <label>
+                  裝置名稱
+                  <input id="deviceName" type="text" placeholder="例如：Frank 的 iPhone" />
+                </label>
+                <label>
+                  裝置類型
+                  <select id="deviceType">
+                    <option value="desktop">電腦版</option>
+                    <option value="mobile">手機版</option>
+                    <option value="web">網頁版</option>
+                  </select>
+                </label>
+                <button id="createSession">
+                  <i data-lucide="plus-circle"></i>
+                  <span>建立主控連線</span>
+                </button>
+              </div>
+
+              <div class="join-row">
+                <input id="joinCode" type="text" placeholder="輸入配對碼" autocomplete="one-time-code" />
+                <button id="joinSession">
+                  <i data-lucide="log-in"></i>
+                  <span>加入</span>
+                </button>
+              </div>
+
+              <div class="session-card">
+                <div>
+                  <span>配對碼</span>
+                  <strong id="pairCode">尚未建立</strong>
+                </div>
+                <button id="copyJoinLink" title="複製連線網址">
+                  <i data-lucide="copy"></i>
+                </button>
+              </div>
+
+              <div class="qr-panel">
+                <img id="qrImage" alt="遠端連線 QR code" />
+                <div>
+                  <span>連線網址</span>
+                  <p id="joinLink">建立 session 後會產生網址。</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="tool-section">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">裝置</p>
+                  <h2>連線狀態</h2>
+                </div>
+              </div>
+              <div id="deviceList" class="device-list"></div>
+            </section>
+
+            <section class="tool-section wide">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">遠端指令</p>
+                  <h2>訊息與指令佇列</h2>
+                </div>
+              </div>
+              <div class="remote-command-row">
+                <select id="commandType">
+                  <option value="text">文字指令</option>
+                  <option value="ping">連線測試</option>
+                  <option value="open_url">開啟網址</option>
+                  <option value="approval">請求確認</option>
+                </select>
+                <input id="remoteCommand" type="text" placeholder="輸入要送到其他裝置的內容" />
+                <button id="sendRemoteCommand">
+                  <i data-lucide="send"></i>
+                  <span>送出</span>
+                </button>
+              </div>
+              <div id="remoteEvents" class="event-log"></div>
+            </section>
+          </div>
         </section>
 
         <section class="view" data-view="planner">
@@ -180,7 +275,7 @@
               </div>
             </div>
             <div class="goal-form">
-              <input id="goalInput" type="text" placeholder="輸入目標，例如：建立 AI Agent 介紹網站並部署" />
+              <input id="goalInput" type="text" placeholder="輸入目標，例如：建立跨手機與電腦的遠端連線" />
               <button id="buildPlan">
                 <i data-lucide="sparkles"></i>
                 <span>產生計畫</span>

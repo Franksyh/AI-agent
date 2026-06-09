@@ -2,27 +2,15 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const storageKey = "future-assistant-ui";
+const remoteStorageKey = "future-assistant-remote";
 
-const state = {
-  mode: "confirm",
-  backendOnline: false,
-  backendInfo: null,
-  currentPlan: [],
-  settings: {
-    voiceReplies: true,
-    largeText: false,
-    highContrast: false,
-    reducedMotion: false,
+const fallbackWorkflows = [
+  {
+    icon: "radio-tower",
+    title: "跨裝置遠端連線",
+    text: "建立配對碼，讓手機、電腦與網頁版加入同一個 session。",
+    goal: "支援手機版、電腦版與網頁版遠端連線功能",
   },
-};
-
-const modeContent = {
-  observe: ["觀察模式", "Agent 只整理資訊與建議，不會執行外部操作。"],
-  confirm: ["確認模式", "高影響操作會先列出計畫，再由你確認。"],
-  execute: ["執行模式", "低風險步驟可直接執行，高風險步驟仍會保留確認。"],
-};
-
-const workflows = [
   {
     icon: "send",
     title: "客戶信件處理",
@@ -42,12 +30,6 @@ const workflows = [
     goal: "將目前資料夾同步至 GitHub 並部署到 Netlify，完成後回傳公開連結",
   },
   {
-    icon: "calendar-check",
-    title: "行程與提醒",
-    text: "整理日程、找出衝突、安排優先順序、建立提醒清單。",
-    goal: "整理本週行程，找出衝突並建立提醒清單",
-  },
-  {
     icon: "file-check-2",
     title: "文件處理",
     text: "摘要文件、抽出待辦、改寫語氣、產生簡報架構。",
@@ -60,6 +42,30 @@ const workflows = [
     goal: "審核一組自動化流程，標記風險、確認點與回復方案",
   },
 ];
+
+const state = {
+  mode: "confirm",
+  apiOnline: false,
+  apiInfo: null,
+  currentPlan: [],
+  workflows: fallbackWorkflows,
+  remotePollTimer: null,
+  remoteHeartbeatTimer: null,
+  remoteCursor: 0,
+  remoteSession: null,
+  settings: {
+    voiceReplies: true,
+    largeText: false,
+    highContrast: false,
+    reducedMotion: false,
+  },
+};
+
+const modeContent = {
+  observe: ["觀察模式", "Agent 只整理資訊與建議，不會執行外部操作。"],
+  confirm: ["確認模式", "高影響操作會先列出計畫，再由你確認。"],
+  execute: ["執行模式", "低風險步驟可直接執行，高風險步驟仍會保留確認。"],
+};
 
 function loadSettings() {
   const saved = localStorage.getItem(storageKey);
@@ -75,6 +81,47 @@ function loadSettings() {
 
 function persistSettings() {
   localStorage.setItem(storageKey, JSON.stringify({ settings: state.settings, mode: state.mode }));
+}
+
+function loadRemoteSession() {
+  const params = new URLSearchParams(location.search);
+  const sessionCode = params.get("session");
+  if (sessionCode) {
+    $("#joinCode").value = sessionCode.toUpperCase();
+    routeTo("remote");
+  }
+
+  const saved = localStorage.getItem(remoteStorageKey);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    if (parsed.sessionId && parsed.token) {
+      state.remoteSession = parsed;
+      state.remoteCursor = Number(parsed.cursor || 0);
+      renderRemoteSession();
+      startRemoteLoop();
+    }
+  } catch {
+    localStorage.removeItem(remoteStorageKey);
+  }
+}
+
+function saveRemoteSession() {
+  if (!state.remoteSession) {
+    localStorage.removeItem(remoteStorageKey);
+    return;
+  }
+  localStorage.setItem(
+    remoteStorageKey,
+    JSON.stringify({
+      sessionId: state.remoteSession.sessionId,
+      code: state.remoteSession.code,
+      token: state.remoteSession.token,
+      deviceId: state.remoteSession.deviceId,
+      role: state.remoteSession.role,
+      cursor: state.remoteCursor,
+    }),
+  );
 }
 
 function applySettings() {
@@ -96,7 +143,6 @@ function updateModeCopy() {
   const [title, copy] = modeContent[state.mode] || modeContent.confirm;
   $("#modeTitle").textContent = title;
   $("#modeCopy").textContent = copy;
-  $("#safetyMetric").textContent = title.replace("模式", "");
 }
 
 function routeTo(route) {
@@ -106,6 +152,73 @@ function routeTo(route) {
   $$(".view").forEach((view) => {
     view.classList.toggle("active", view.dataset.view === route);
   });
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await response.json();
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "動態 API 回應失敗");
+  }
+  return data;
+}
+
+async function checkDynamicApi() {
+  try {
+    const data = await api("/api/state");
+    state.apiOnline = Boolean(data.dynamic);
+    state.apiInfo = data;
+  } catch {
+    state.apiOnline = false;
+    state.apiInfo = null;
+  }
+
+  renderConnection();
+  renderSystemInfo();
+}
+
+function renderConnection() {
+  const dot = $("#connectionDot");
+  dot.classList.toggle("online", state.apiOnline);
+  dot.classList.toggle("offline", !state.apiOnline);
+  $("#connectionStatus").textContent = state.apiOnline ? "動態 API 已連線" : "瀏覽器備援模式";
+  $("#apiModeMetric").textContent = state.apiOnline ? "Dynamic" : "Fallback";
+}
+
+function renderSystemInfo() {
+  const data = {
+    網站模式: state.apiOnline ? "Netlify 動態網站" : "瀏覽器備援模式",
+    API: state.apiInfo?.runtime || "未連線",
+    版本: state.apiInfo?.apiVersion || "local-fallback",
+    遠端連線: state.apiInfo?.capabilities?.remoteSessions ? "支援" : "未確認",
+    RequestID: state.apiInfo?.requestId || "無",
+    伺服器時間: state.apiInfo?.serverTime ? formatDateTime(state.apiInfo.serverTime) : "無",
+    GitHub: "Franksyh/AI-agent",
+    Netlify: "franksyh-ai-agent.netlify.app",
+  };
+
+  const info = $("#systemInfo");
+  info.innerHTML = "";
+  Object.entries(data).forEach(([key, value]) => {
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = key;
+    dd.textContent = value;
+    info.append(dt, dd);
+  });
+}
+
+async function loadWorkflows() {
+  try {
+    const data = await api("/api/workflows");
+    state.workflows = data.workflows || fallbackWorkflows;
+  } catch {
+    state.workflows = fallbackWorkflows;
+  }
+  renderWorkflows();
 }
 
 function addMessage(role, text) {
@@ -129,57 +242,6 @@ function speak(text) {
   speechSynthesis.speak(utterance);
 }
 
-async function checkBackend() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1400);
-  try {
-    const response = await fetch("/api/state", { signal: controller.signal });
-    if (!response.ok) throw new Error("backend unavailable");
-    state.backendInfo = await response.json();
-    state.backendOnline = true;
-  } catch {
-    state.backendOnline = false;
-    state.backendInfo = null;
-  } finally {
-    clearTimeout(timer);
-    renderConnection();
-    renderSystemInfo();
-  }
-}
-
-function renderConnection() {
-  const dot = $("#connectionDot");
-  dot.classList.toggle("online", state.backendOnline);
-  dot.classList.toggle("offline", !state.backendOnline);
-  $("#connectionStatus").textContent = state.backendOnline ? "本機 Agent 已連線" : "Netlify 展示模式";
-}
-
-function renderSystemInfo() {
-  const data = {
-    模式: state.backendOnline ? "本機後端" : "靜態網站",
-    瀏覽器: navigator.userAgent,
-    語音輸入: window.SpeechRecognition || window.webkitSpeechRecognition ? "可用" : "未支援",
-    儲存: "localStorage",
-    GitHub: "Franksyh/AI-agent",
-    Netlify: "franksyh-ai-agent.netlify.app",
-  };
-
-  if (state.backendInfo) {
-    data.Python = state.backendInfo.python || "已連線";
-    data.工作區 = state.backendInfo.workspace || "本機";
-  }
-
-  const info = $("#systemInfo");
-  info.innerHTML = "";
-  Object.entries(data).forEach(([key, value]) => {
-    const dt = document.createElement("dt");
-    const dd = document.createElement("dd");
-    dt.textContent = key;
-    dd.textContent = value;
-    info.append(dt, dd);
-  });
-}
-
 async function handleChat(event) {
   event.preventDefault();
   const input = $("#promptInput");
@@ -189,93 +251,47 @@ async function handleChat(event) {
   input.value = "";
   addMessage("user", message);
 
-  if (state.backendOnline) {
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-      const data = await response.json();
-      if (!response.ok || data.ok === false) throw new Error(data.error || "本機 Agent 回應失敗");
-      addMessage("system", data.reply || buildLocalReply(message));
-      if (data.suggestions?.length) {
-        const goal = data.suggestions.map((item) => item.title || item.action).join("，");
-        setPlan(createPlan(goal));
-      }
-      return;
-    } catch {
-      state.backendOnline = false;
-      renderConnection();
-    }
+  try {
+    const data = await api("/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, mode: state.mode }),
+    });
+    state.apiOnline = true;
+    state.apiInfo = { ...state.apiInfo, requestId: data.requestId, serverTime: data.generatedAt };
+    renderConnection();
+    renderSystemInfo();
+    addMessage("system", data.reply);
+    if (data.plan) setPlan(data.plan);
+  } catch {
+    state.apiOnline = false;
+    renderConnection();
+    const plan = createFallbackPlan(message);
+    addMessage("system", buildFallbackReply(message, plan));
+    setPlan(plan);
   }
-
-  const reply = buildLocalReply(message);
-  addMessage("system", reply);
-  setPlan(createPlan(message));
 }
 
-function buildLocalReply(message) {
-  const lower = message.toLowerCase();
-  if (lower.includes("github") || lower.includes("netlify") || message.includes("部署") || message.includes("同步")) {
-    return "我會把流程拆成四段：檢查檔案、提交 GitHub、部署 Netlify、驗證公開網址。這個展示站會先產生清楚的執行清單。";
+async function buildPlanFromInput() {
+  const goal = $("#goalInput").value.trim() || "支援手機版、電腦版與網頁版遠端連線功能";
+  try {
+    const data = await api("/api/plan", {
+      method: "POST",
+      body: JSON.stringify({ goal, mode: state.mode }),
+    });
+    state.apiOnline = true;
+    state.apiInfo = { ...state.apiInfo, requestId: data.requestId, serverTime: data.generatedAt };
+    renderConnection();
+    renderSystemInfo();
+    setPlan(data.plan);
+  } catch {
+    state.apiOnline = false;
+    renderConnection();
+    setPlan(createFallbackPlan(goal));
   }
-  if (message.includes("文件") || message.includes("摘要") || message.includes("PDF")) {
-    return "可以先上傳文字或 Markdown 檔，我會摘要重點、抓出待辦，並把結果轉成可交付的結構。";
-  }
-  if (message.includes("搜尋") || message.includes("研究") || message.includes("比較")) {
-    return "我會先定義研究問題，再整理來源、比較條件與輸出格式，避免只得到零散連結。";
-  }
-  if (message.includes("客服") || message.includes("信件")) {
-    return "我會辨識情緒、需求、期限與下一步，先產生回覆草稿，再建立待辦。";
-  }
-  return "我已經把你的目標轉成可執行計畫。你可以到任務規劃檢查步驟，也可以複製成 Markdown 繼續使用。";
-}
-
-function createPlan(goal) {
-  const text = goal.trim() || "建立一個可發布的 AI Agent 工作流程";
-  const lower = text.toLowerCase();
-  const deploy = lower.includes("github") || lower.includes("netlify") || text.includes("部署") || text.includes("同步");
-  const research = text.includes("研究") || text.includes("搜尋") || text.includes("比較");
-  const documentTask = text.includes("文件") || text.includes("摘要") || text.includes("簡報");
-
-  if (deploy) {
-    return [
-      { phase: "檢查", steps: ["確認工作區狀態", "檢查首頁與靜態資源", "排除不應上傳的本機檔案"] },
-      { phase: "提交", steps: ["建立清楚的 commit", "推送到 GitHub main", "確認遠端 commit 一致"] },
-      { phase: "部署", steps: ["使用既有 Netlify site", "上傳最新檔案", "等待 production deploy ready"] },
-      { phase: "驗證", steps: ["開啟公開網址", "檢查 HTTP 200", "回傳 GitHub 與 Netlify 連結"] },
-    ];
-  }
-
-  if (research) {
-    return [
-      { phase: "定義", steps: ["確認研究問題", "列出比較條件", "決定輸出格式"] },
-      { phase: "蒐集", steps: ["搜尋主要來源", "記錄可信來源", "標記日期與限制"] },
-      { phase: "整理", steps: ["分群重點", "建立比較表", "寫出結論摘要"] },
-      { phase: "交付", steps: ["產出報告", "補上引用", "列出下一步"] },
-    ];
-  }
-
-  if (documentTask) {
-    return [
-      { phase: "讀取", steps: ["匯入文件", "辨識章節", "抽出關鍵名詞"] },
-      { phase: "摘要", steps: ["整理三到五個重點", "標記風險", "萃取待辦"] },
-      { phase: "轉換", steps: ["改寫成簡報大綱", "產生表格", "整理成寄送版本"] },
-      { phase: "確認", steps: ["檢查語氣", "補齊缺漏", "輸出最終版本"] },
-    ];
-  }
-
-  return [
-    { phase: "理解", steps: [`確認目標：${text}`, "列出限制條件", "定義完成標準"] },
-    { phase: "規劃", steps: ["拆解可執行步驟", "排序優先順序", "標記需要確認的節點"] },
-    { phase: "執行", steps: ["處理低風險步驟", "保存中間結果", "回報阻塞事項"] },
-    { phase: "交付", steps: ["整理成果", "驗證輸出", "提供下一步建議"] },
-  ];
 }
 
 function setPlan(plan) {
-  state.currentPlan = plan;
+  state.currentPlan = Array.isArray(plan) ? plan : [];
   renderPlan();
   routeTo("planner");
 }
@@ -323,8 +339,7 @@ function planMarkdown() {
 }
 
 async function copyPlan() {
-  const markdown = planMarkdown();
-  await navigator.clipboard.writeText(markdown);
+  await navigator.clipboard.writeText(planMarkdown());
   addMessage("system", "計畫已複製到剪貼簿。");
 }
 
@@ -338,10 +353,230 @@ function downloadPlan() {
   URL.revokeObjectURL(url);
 }
 
+async function createRemoteSession() {
+  try {
+    const data = await remoteApi("create", {
+      deviceName: getDeviceName(),
+      deviceType: $("#deviceType").value,
+    });
+    attachRemoteSession(data);
+    routeTo("remote");
+    addRemoteEvent("系統", "已建立主控連線，手機或網頁版可用配對碼加入。");
+  } catch (error) {
+    addRemoteEvent("錯誤", error.message);
+  }
+}
+
+async function joinRemoteSession() {
+  const code = $("#joinCode").value.trim().toUpperCase();
+  if (!code) {
+    addRemoteEvent("提醒", "請先輸入配對碼。");
+    return;
+  }
+
+  try {
+    const data = await remoteApi("join", {
+      code,
+      deviceName: getDeviceName(),
+      deviceType: $("#deviceType").value,
+    });
+    attachRemoteSession(data);
+    routeTo("remote");
+    addRemoteEvent("系統", "已加入遠端 session。");
+  } catch (error) {
+    addRemoteEvent("錯誤", error.message);
+  }
+}
+
+async function remoteApi(action, payload = {}) {
+  return api("/api/remote", {
+    method: "POST",
+    body: JSON.stringify({ action, ...payload }),
+  });
+}
+
+function attachRemoteSession(data) {
+  state.apiOnline = true;
+  state.remoteSession = {
+    sessionId: data.session.id,
+    code: data.session.code,
+    token: data.token,
+    deviceId: data.deviceId,
+    role: data.role,
+    session: data.session,
+  };
+  state.remoteCursor = data.cursor || data.session.sequence || 0;
+  saveRemoteSession();
+  renderConnection();
+  renderRemoteSession();
+  startRemoteLoop();
+}
+
+function startRemoteLoop() {
+  stopRemoteLoop();
+  pollRemoteSession();
+  state.remoteHeartbeatTimer = setInterval(sendHeartbeat, 15000);
+  state.remotePollTimer = setInterval(pollRemoteSession, 5000);
+}
+
+function stopRemoteLoop() {
+  clearInterval(state.remoteHeartbeatTimer);
+  clearInterval(state.remotePollTimer);
+  state.remoteHeartbeatTimer = null;
+  state.remotePollTimer = null;
+}
+
+async function sendHeartbeat() {
+  if (!state.remoteSession) return;
+  try {
+    await remoteApi("heartbeat", {
+      sessionId: state.remoteSession.sessionId,
+      token: state.remoteSession.token,
+      deviceName: getDeviceName(),
+      deviceType: $("#deviceType").value,
+    });
+  } catch {
+    $("#remoteStatusBadge").textContent = "等待重連";
+  }
+}
+
+async function pollRemoteSession() {
+  if (!state.remoteSession) return;
+  try {
+    const data = await remoteApi("poll", {
+      sessionId: state.remoteSession.sessionId,
+      token: state.remoteSession.token,
+      cursor: state.remoteCursor,
+    });
+    state.remoteSession.session = data.session;
+    state.remoteCursor = data.cursor;
+    saveRemoteSession();
+    renderRemoteSession();
+    (data.events || []).forEach((event) => addRemoteEvent(event.fromName || event.type, event.message || event.payload?.text || event.commandType));
+  } catch (error) {
+    $("#remoteStatusBadge").textContent = "連線中斷";
+    addRemoteEvent("錯誤", error.message);
+  }
+}
+
+async function sendRemoteCommand() {
+  if (!state.remoteSession) {
+    addRemoteEvent("提醒", "請先建立或加入遠端 session。");
+    return;
+  }
+
+  const commandType = $("#commandType").value;
+  const text = $("#remoteCommand").value.trim() || (commandType === "ping" ? "連線測試" : "");
+  if (!text && commandType !== "ping") return;
+
+  try {
+    const data = await remoteApi("send", {
+      sessionId: state.remoteSession.sessionId,
+      token: state.remoteSession.token,
+      commandType,
+      target: "all",
+      payload: {
+        text,
+        url: commandType === "open_url" ? text : "",
+      },
+    });
+    state.remoteSession.session = data.session;
+    state.remoteCursor = data.cursor;
+    $("#remoteCommand").value = "";
+    renderRemoteSession();
+    addRemoteEvent("已送出", text || commandType);
+  } catch (error) {
+    addRemoteEvent("錯誤", error.message);
+  }
+}
+
+function renderRemoteSession() {
+  const remote = state.remoteSession;
+  const session = remote?.session;
+  const devices = session?.devices || [];
+  const joinUrl = session ? `${location.origin}${location.pathname}?session=${encodeURIComponent(session.code)}` : "";
+
+  $("#remoteMetric").textContent = String(devices.length);
+  $("#remoteStatusBadge").textContent = session ? session.status === "closed" ? "已關閉" : "已連線" : "未連線";
+  $("#pairCode").textContent = session?.code || "尚未建立";
+  $("#joinLink").textContent = joinUrl || "建立 session 後會產生網址。";
+
+  const qr = $("#qrImage");
+  if (joinUrl) {
+    qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(joinUrl)}`;
+    qr.hidden = false;
+  } else {
+    qr.removeAttribute("src");
+    qr.hidden = true;
+  }
+
+  const list = $("#deviceList");
+  list.innerHTML = "";
+  if (!devices.length) {
+    list.innerHTML = `<div class="result-box">尚未連線裝置。</div>`;
+    return;
+  }
+
+  devices.forEach((device) => {
+    const item = document.createElement("article");
+    item.className = "device-item";
+    item.innerHTML = `
+      <i data-lucide="${deviceIcon(device.type)}"></i>
+      <div>
+        <strong>${escapeHtml(device.name)}</strong>
+        <small>${escapeHtml(deviceLabel(device.type))} · ${escapeHtml(device.role)} · ${device.online ? "在線" : "離線"}</small>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+  refreshIcons();
+}
+
+async function copyJoinLink() {
+  const session = state.remoteSession?.session;
+  if (!session) return;
+  const joinUrl = `${location.origin}${location.pathname}?session=${encodeURIComponent(session.code)}`;
+  await navigator.clipboard.writeText(joinUrl);
+  addRemoteEvent("系統", "連線網址已複製。");
+}
+
+function addRemoteEvent(title, detail) {
+  const log = $("#remoteEvents");
+  const node = document.createElement("div");
+  node.className = "event-item";
+  node.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    <span>${escapeHtml(detail || "")}</span>
+    <small>${new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</small>
+  `;
+  log.prepend(node);
+}
+
+function getDeviceName() {
+  const input = $("#deviceName");
+  const name = input.value.trim();
+  if (name) return name;
+  const fallback = $("#deviceType").value === "mobile" ? "手機版裝置" : $("#deviceType").value === "desktop" ? "電腦版裝置" : "網頁版裝置";
+  input.value = fallback;
+  return fallback;
+}
+
+function deviceIcon(type) {
+  if (type === "mobile") return "smartphone";
+  if (type === "desktop") return "monitor";
+  return "globe-2";
+}
+
+function deviceLabel(type) {
+  if (type === "mobile") return "手機版";
+  if (type === "desktop") return "電腦版";
+  return "網頁版";
+}
+
 function renderWorkflows() {
   const grid = $("#workflowGrid");
   grid.innerHTML = "";
-  workflows.forEach((workflow) => {
+  state.workflows.forEach((workflow) => {
     const card = document.createElement("article");
     card.className = "workflow-card";
     card.innerHTML = `
@@ -355,10 +590,10 @@ function renderWorkflows() {
         <span>建立計畫</span>
       </button>
     `;
-    card.querySelector("button").addEventListener("click", () => {
+    card.querySelector("button").addEventListener("click", async () => {
       $("#goalInput").value = workflow.goal;
-      setPlan(createPlan(workflow.goal));
-      addMessage("system", `已建立「${workflow.title}」的流程計畫。`);
+      await buildPlanFromInput();
+      addMessage("system", `已建立「${workflow.title}」的動態流程計畫。`);
     });
     grid.appendChild(card);
   });
@@ -367,15 +602,14 @@ function renderWorkflows() {
 
 function handleQuickAction(intent) {
   const map = {
+    remote: "支援手機版、電腦版與網頁版遠端連線功能",
     "github-netlify": "將目前資料夾同步至 GitHub 並部署到 Netlify，完成後回傳公開連結",
     research: "整理 AI Agent 產品趨勢，產生比較表與重點摘要",
     document: "摘要一份產品介紹文件，整理成簡報大綱",
-    support: "收到客戶詢問後，自動產生禮貌回覆與待辦事項",
   };
-  const goal = map[intent] || "規劃一個 AI Agent 工作流程";
-  $("#goalInput").value = goal;
-  setPlan(createPlan(goal));
-  addMessage("system", `已建立快速任務：${goal}`);
+  $("#goalInput").value = map[intent] || "規劃一個 AI Agent 工作流程";
+  if (intent === "remote") routeTo("remote");
+  buildPlanFromInput();
 }
 
 async function summarizeFile(file) {
@@ -386,19 +620,64 @@ async function summarizeFile(file) {
   }
 
   const text = await file.text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const preview = lines.slice(0, 8).join("\n");
+  try {
+    const data = await api("/api/brief", {
+      method: "POST",
+      body: JSON.stringify({
+        name: file.name,
+        size: file.size,
+        text: text.slice(0, 20000),
+      }),
+    });
+    state.apiOnline = true;
+    state.apiInfo = { ...state.apiInfo, requestId: data.requestId, serverTime: data.generatedAt };
+    renderConnection();
+    renderSystemInfo();
+    summary.textContent = formatBrief(file, data.brief, true);
+  } catch {
+    state.apiOnline = false;
+    renderConnection();
+    summary.textContent = formatBrief(file, createLocalBrief(text), false);
+  }
+}
 
-  summary.textContent = [
+function formatBrief(file, brief, dynamic) {
+  const keywords = brief.keywords?.length
+    ? brief.keywords.map((item) => `${item.keyword} (${item.count})`).join("、")
+    : "無";
+  const actions = brief.actionItems?.length ? brief.actionItems.map((item) => `- ${item}`).join("\n") : "無";
+  const summary = brief.summary?.length ? brief.summary.map((item) => `- ${item}`).join("\n") : "無";
+
+  return [
+    `模式：${dynamic ? "Netlify 動態摘要" : "瀏覽器本機摘要"}`,
     `檔名：${file.name}`,
     `大小：${formatBytes(file.size)}`,
-    `行數：${lines.length}`,
-    `詞數：約 ${words}`,
+    `行數：${brief.lineCount}`,
+    `字元數：${brief.charCount}`,
     "",
-    "前段預覽：",
-    preview || "沒有可讀文字內容。",
+    "重點摘要：",
+    summary,
+    "",
+    "可能關鍵字：",
+    keywords,
+    "",
+    "待辦線索：",
+    actions,
   ].join("\n");
+}
+
+function createLocalBrief(text) {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  const lines = normalized.split("\n").filter(Boolean);
+  const sentences = normalized.split(/[。.!?\n]/).map((item) => item.trim()).filter(Boolean);
+  return {
+    lineCount: lines.length,
+    wordCount: normalized ? normalized.split(/\s+/).length : 0,
+    charCount: normalized.length,
+    summary: sentences.slice(0, 3),
+    actionItems: lines.filter((line) => /待辦|下一步|需要|請|必須|todo|should|must/i.test(line)).slice(0, 6),
+    keywords: [],
+  };
 }
 
 function openSearch() {
@@ -424,8 +703,7 @@ function setupVoiceInput() {
   recognition.continuous = false;
 
   recognition.addEventListener("result", (event) => {
-    const text = event.results[0][0].transcript;
-    $("#promptInput").value = text;
+    $("#promptInput").value = event.results[0][0].transcript;
     $("#chatForm").requestSubmit();
   });
 
@@ -442,11 +720,15 @@ function setupEvents() {
   });
 
   $("#chatForm").addEventListener("submit", handleChat);
-  $("#buildPlan").addEventListener("click", () => setPlan(createPlan($("#goalInput").value)));
+  $("#buildPlan").addEventListener("click", buildPlanFromInput);
   $("#copyPlan").addEventListener("click", copyPlan);
   $("#downloadPlan").addEventListener("click", downloadPlan);
   $("#fileInput").addEventListener("change", (event) => summarizeFile(event.target.files[0]));
   $("#openSearch").addEventListener("click", openSearch);
+  $("#createSession").addEventListener("click", createRemoteSession);
+  $("#joinSession").addEventListener("click", joinRemoteSession);
+  $("#copyJoinLink").addEventListener("click", copyJoinLink);
+  $("#sendRemoteCommand").addEventListener("click", sendRemoteCommand);
 
   $$("input[name='mode']").forEach((input) => {
     input.addEventListener("change", (event) => {
@@ -480,6 +762,63 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+function createFallbackPlan(goal) {
+  const text = goal.trim() || "支援手機版、電腦版與網頁版遠端連線功能";
+  const lower = text.toLowerCase();
+  const remote = text.includes("遠端") || text.includes("手機") || text.includes("電腦") || text.includes("網頁");
+  const deploy = lower.includes("github") || lower.includes("netlify") || text.includes("部署") || text.includes("同步");
+  const research = text.includes("研究") || text.includes("搜尋") || text.includes("比較");
+  const documentTask = text.includes("文件") || text.includes("摘要") || text.includes("簡報");
+
+  if (remote) {
+    return [
+      { phase: "建立連線", steps: ["電腦版建立主控 session", "產生配對碼與 QR code", "保存 session token"] },
+      { phase: "跨裝置加入", steps: ["手機版用配對碼加入", "網頁版用連線網址加入", "顯示裝置類型與在線狀態"] },
+      { phase: "同步狀態", steps: ["定期送出心跳", "輪詢遠端事件", "更新裝置清單與指令佇列"] },
+      { phase: "安全控制", steps: ["每台裝置使用獨立 token", "高風險操作保留人工確認", "可關閉或重建 session"] },
+    ];
+  }
+
+  if (deploy) {
+    return [
+      { phase: "檢查", steps: ["確認工作區狀態", "檢查首頁、動態 API 與靜態資源", "排除不應上傳的本機檔案"] },
+      { phase: "提交", steps: ["建立清楚的 commit", "推送到 GitHub main", "確認遠端 commit 與本機一致"] },
+      { phase: "部署", steps: ["使用既有 Netlify site", "部署 Netlify Functions 與前端檔案", "等待 production deploy ready"] },
+      { phase: "驗證", steps: ["檢查公開首頁 HTTP 200", "呼叫 /api/state 確認動態 API", "回傳 GitHub 與 Netlify 連結"] },
+    ];
+  }
+
+  if (research) {
+    return [
+      { phase: "定義", steps: ["確認研究問題", "列出比較條件", "決定輸出格式"] },
+      { phase: "蒐集", steps: ["搜尋主要來源", "記錄可信來源", "標記日期與限制"] },
+      { phase: "整理", steps: ["分群重點", "建立比較表", "寫出結論摘要"] },
+      { phase: "交付", steps: ["產出報告", "補上引用", "列出下一步"] },
+    ];
+  }
+
+  if (documentTask) {
+    return [
+      { phase: "讀取", steps: ["匯入文件", "辨識章節", "抽出關鍵名詞"] },
+      { phase: "摘要", steps: ["整理三到五個重點", "標記風險", "萃取待辦"] },
+      { phase: "轉換", steps: ["改寫成簡報大綱", "產生表格", "整理成寄送版本"] },
+      { phase: "確認", steps: ["檢查語氣", "補齊缺漏", "輸出最終版本"] },
+    ];
+  }
+
+  return [
+    { phase: "理解", steps: [`確認目標：${text}`, "列出限制條件", "定義完成標準"] },
+    { phase: "規劃", steps: ["拆解可執行步驟", "排序優先順序", "標記需要確認的節點"] },
+    { phase: "執行", steps: ["處理低風險步驟", "保存中間結果", "回報阻塞事項"] },
+    { phase: "交付", steps: ["整理成果", "驗證輸出", "提供下一步建議"] },
+  ];
+}
+
+function buildFallbackReply(message, plan) {
+  const stepCount = plan.reduce((sum, item) => sum + item.steps.length, 0);
+  return `目前使用瀏覽器備援邏輯。我已把「${message}」拆成 ${plan.length} 個階段、${stepCount} 個步驟。`;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -500,17 +839,38 @@ function formatBytes(size) {
   return `${value.toFixed(index ? 1 : 0)} ${units[index]}`;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function formatDateTime(value) {
+  try {
+    return new Date(value).toLocaleString("zh-TW", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   loadSettings();
   applySettings();
   setupEvents();
   setupVoiceInput();
-  renderWorkflows();
-  setPlan(createPlan("將目前資料夾同步至 GitHub 並部署到 Netlify，完成後回傳公開連結"));
-  routeTo("overview");
+  loadRemoteSession();
   refreshClock();
   setInterval(refreshClock, 1000);
-  checkBackend();
-  addMessage("system", "歡迎使用 Future Assistant。輸入一個目標，我會把它拆成可執行的工作流程。");
+
+  await checkDynamicApi();
+  await loadWorkflows();
+  await buildPlanFromInput();
+  routeTo(new URLSearchParams(location.search).has("session") ? "remote" : "overview");
+
+  addMessage(
+    "system",
+    state.apiOnline
+      ? "歡迎使用 Future Assistant。現在已連上 Netlify 動態 API，遠端連線、任務計畫與摘要會由伺服器即時產生。"
+      : "歡迎使用 Future Assistant。目前使用瀏覽器備援模式，部署後會自動切換到 Netlify 動態 API。",
+  );
   refreshIcons();
 });
