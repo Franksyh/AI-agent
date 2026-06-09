@@ -1,44 +1,51 @@
 # Future Assistant
 
-一個可在本機執行的 AI 電腦助手原型。它提供文字/語音互動、命令執行、網路搜尋、檔案搜尋、截圖、滑鼠鍵盤控制、剪貼簿輔助與輔助使用模式。
+Future Assistant 是一個 AI Agent 工作台，用來展示「理解目標、拆解步驟、使用工具、交付結果」的完整流程。
 
-## 啟動
+公開網站：
+
+https://franksyh-ai-agent.netlify.app
+
+## 這次優化
+
+- 修正介面文字亂碼，改成完整繁體中文。
+- 將首頁改成可直接操作的 AI Agent 工作台。
+- 加入目標拆解器，可把任務轉成四階段工作計畫。
+- 加入 GitHub + Netlify 發布流程模板。
+- 加入檔案摘要工具，支援文字、Markdown、CSV、JSON、HTML、CSS、JS。
+- 加入搜尋草稿、工作流程模板、語音輸入與無障礙設定。
+- Netlify 靜態部署時不再依賴後端 API，避免公開站功能失效。
+- 本機若啟動 Python 後端，前端會自動偵測並切換為本機 Agent 已連線。
+
+## 本機執行
+
+靜態頁面可直接由瀏覽器開啟 `index.html`。
+
+若要啟動本機 Python 助理服務：
 
 ```powershell
 python .\assistant_server.py
 ```
 
-開啟後瀏覽器會自動進入：
+預設網址：
 
 ```text
 http://127.0.0.1:8765
 ```
 
-如需改 port：
+指定其他 port：
 
 ```powershell
 python .\assistant_server.py 8899
 ```
 
-## 功能
+## 部署流程
 
-- 對話式指令：輸入「搜尋 Windows 快捷鍵」、「截圖」、「執行: Get-Date」。
-- 語音輸入與語音回覆：優先使用瀏覽器 Web Speech API；不支援時可用錄音轉文字 API；沒有 API Key 時會嘗試啟動 Windows 語音輸入。
-- 命令執行：PowerShell 命令會先檢查並要求確認；嚴格安全模式會阻擋常見高風險命令。
-- 電腦控制：支援 Windows 滑鼠移動、點擊、輸入文字與快捷鍵。
-- 搜尋資料：可抓取 DuckDuckGo HTML 搜尋結果；失敗時仍會提供搜尋頁連結。
-- 輔助使用：大型文字、高對比、減少動態、剪貼簿朗讀、截圖預覽與專注模式。
-- AI 核心設定：可填入 OpenAI-compatible API base、model、API key，讓對話回覆接入真正模型。
-- Speech Model 設定：預設 `whisper-1`，用於瀏覽器不支援即時語音辨識時的錄音轉文字備援。
+1. 檢查工作區狀態。
+2. Commit 並推送到 GitHub `main`。
+3. 部署到 Netlify 專案 `franksyh-ai-agent`。
+4. 驗證公開網址可正常開啟。
 
-## 安全設計
+## Repo 維護
 
-這個助手能操作電腦，所以預設採用「確認模式」。命令、滑鼠鍵盤與高風險動作都應由使用者明確確認後才執行。請不要在不信任的環境中開放這個本機服務，也不要把 API Key 交給不可信任的前端或外部網頁。
-
-## 下一步可擴充
-
-- 接入多模態模型，讓截圖可由模型分析。
-- 加入可審核的任務計畫器，讓長任務分步執行。
-- 建立可撤銷的操作紀錄。
-- 加入本機向量資料庫，長期記憶常用檔案、軟體和使用習慣。
-- 支援 Windows UI Automation，讓助手能讀取視窗、按鈕與控制項結構。
+`.gitignore` 已忽略 Netlify 本機狀態與 Python 快取檔，避免把產生物提交到 GitHub。

@@ -3,207 +3,282 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Future Assistant</title>
+    <meta
+      name="description"
+      content="Future Assistant 是一個展示 AI Agent 工作流程、任務規劃與自動化能力的互動式工作台。"
+    />
+    <title>Future Assistant | AI Agent 工作台</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
-      <aside class="side-rail" aria-label="主要工具">
-        <button class="icon-button active" data-view="assistant" title="助手">
-          <i data-lucide="bot"></i>
+      <aside class="side-rail" aria-label="主要功能">
+        <button class="rail-button active" data-route="overview" title="工作台">
+          <i data-lucide="layout-dashboard"></i>
         </button>
-        <button class="icon-button" data-view="computer" title="電腦控制">
-          <i data-lucide="mouse-pointer-2"></i>
+        <button class="rail-button" data-route="planner" title="任務規劃">
+          <i data-lucide="list-checks"></i>
         </button>
-        <button class="icon-button" data-view="search" title="搜尋">
-          <i data-lucide="search"></i>
+        <button class="rail-button" data-route="files" title="資料整理">
+          <i data-lucide="folder-search"></i>
         </button>
-        <button class="icon-button" data-view="access" title="輔助使用">
-          <i data-lucide="accessibility"></i>
+        <button class="rail-button" data-route="automations" title="自動化">
+          <i data-lucide="workflow"></i>
         </button>
-        <button class="icon-button" data-view="settings" title="設定">
+        <button class="rail-button" data-route="settings" title="設定">
           <i data-lucide="settings-2"></i>
         </button>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
-          <div>
+          <div class="brand-block">
             <p class="eyebrow">Future Assistant</p>
-            <h1>AI 電腦助手控制台</h1>
+            <h1>AI Agent 工作台</h1>
           </div>
-          <div class="status-strip">
+          <div class="status-strip" aria-live="polite">
             <span id="connectionDot" class="dot"></span>
-            <span id="statusText">連線中</span>
-            <span id="systemClock"></span>
+            <span id="connectionStatus">檢查連線中</span>
+            <span id="clock"></span>
           </div>
         </header>
 
-        <section class="view active" id="assistantView" data-view-panel="assistant">
-          <div class="chat-layout">
-            <section class="conversation-panel" aria-label="對話">
-              <div class="mode-row">
-                <label class="segmented">
-                  <input type="radio" name="autonomy" value="observe" />
-                  <span>觀察</span>
-                </label>
-                <label class="segmented">
-                  <input type="radio" name="autonomy" value="confirm" checked />
-                  <span>確認</span>
-                </label>
-                <label class="segmented">
-                  <input type="radio" name="autonomy" value="execute" />
-                  <span>執行</span>
-                </label>
+        <section class="view active" data-view="overview">
+          <div class="overview-layout">
+            <section class="assistant-panel">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">指令中心</p>
+                  <h2>把目標交給 Agent 拆成行動</h2>
+                </div>
+                <button id="voiceButton" class="icon-button" title="語音輸入">
+                  <i data-lucide="mic"></i>
+                </button>
               </div>
 
               <div id="messages" class="messages" aria-live="polite"></div>
 
               <form id="chatForm" class="composer">
-                <button type="button" id="micButton" class="icon-button large" title="語音輸入">
-                  <i data-lucide="mic"></i>
-                </button>
-                <textarea id="promptInput" rows="2" placeholder="輸入你想讓助手做的事，例如：搜尋 Windows 快捷鍵、截圖、執行: Get-Date"></textarea>
-                <button type="submit" class="send-button" title="送出">
+                <textarea
+                  id="promptInput"
+                  rows="2"
+                  placeholder="例如：幫我整理 AI Agent 產品介紹，產生發布到 GitHub 與 Netlify 的工作流程"
+                ></textarea>
+                <button class="send-button" type="submit" title="送出">
                   <i data-lucide="send"></i>
                 </button>
-                <p id="voiceStatus" class="voice-status">語音輸入待命</p>
               </form>
             </section>
 
-            <aside class="action-panel" aria-label="建議動作">
-              <div class="panel-heading">
-                <h2>動作佇列</h2>
-                <button id="clearActions" class="ghost-button">清空</button>
+            <aside class="execution-panel">
+              <div class="panel-title compact">
+                <div>
+                  <p class="eyebrow">執行模式</p>
+                  <h2>安全層級</h2>
+                </div>
               </div>
-              <div id="suggestions" class="suggestions"></div>
-              <div class="quick-grid">
-                <button data-quick="screenshot"><i data-lucide="scan-line"></i><span>截圖</span></button>
-                <button data-quick="clipboard"><i data-lucide="clipboard"></i><span>剪貼簿</span></button>
-                <button data-quick="date"><i data-lucide="terminal"></i><span>時間命令</span></button>
-                <button data-quick="search"><i data-lucide="globe-2"></i><span>網路搜尋</span></button>
+
+              <div class="segmented-group" role="radiogroup" aria-label="執行模式">
+                <label>
+                  <input type="radio" name="mode" value="observe" />
+                  <span>觀察</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="confirm" checked />
+                  <span>確認</span>
+                </label>
+                <label>
+                  <input type="radio" name="mode" value="execute" />
+                  <span>執行</span>
+                </label>
+              </div>
+
+              <div class="mode-card">
+                <strong id="modeTitle">確認模式</strong>
+                <p id="modeCopy">高影響操作會先列出計畫，再由你確認。</p>
+              </div>
+
+              <div class="quick-actions" aria-label="快速任務">
+                <button data-intent="github-netlify">
+                  <i data-lucide="rocket"></i>
+                  <span>發布網站</span>
+                </button>
+                <button data-intent="research">
+                  <i data-lucide="search-check"></i>
+                  <span>整理資料</span>
+                </button>
+                <button data-intent="document">
+                  <i data-lucide="file-text"></i>
+                  <span>摘要文件</span>
+                </button>
+                <button data-intent="support">
+                  <i data-lucide="messages-square"></i>
+                  <span>客服回覆</span>
+                </button>
               </div>
             </aside>
           </div>
+
+          <section class="metrics-row" aria-label="產品狀態">
+            <article class="metric-card">
+              <span>任務拆解</span>
+              <strong id="planCount">0</strong>
+              <small>待辦步驟</small>
+            </article>
+            <article class="metric-card">
+              <span>部署狀態</span>
+              <strong>Ready</strong>
+              <small>GitHub + Netlify</small>
+            </article>
+            <article class="metric-card">
+              <span>安全策略</span>
+              <strong id="safetyMetric">Confirm</strong>
+              <small>預設人工確認</small>
+            </article>
+          </section>
+
+          <section class="capability-grid" aria-label="Agent 能力">
+            <article class="capability-card">
+              <i data-lucide="brain-circuit"></i>
+              <h3>理解目標</h3>
+              <p>把自然語言轉成可執行的工作目標、限制與交付物。</p>
+            </article>
+            <article class="capability-card">
+              <i data-lucide="route"></i>
+              <h3>規劃步驟</h3>
+              <p>自動拆成階段、檢查點與可交付成果。</p>
+            </article>
+            <article class="capability-card">
+              <i data-lucide="plug"></i>
+              <h3>串接工具</h3>
+              <p>支援 GitHub、Netlify、檔案處理與瀏覽器功能。</p>
+            </article>
+            <article class="capability-card">
+              <i data-lucide="shield-check"></i>
+              <h3>安全執行</h3>
+              <p>依風險切換觀察、確認與執行模式。</p>
+            </article>
+          </section>
         </section>
 
-        <section class="view" id="computerView" data-view-panel="computer">
+        <section class="view" data-view="planner">
+          <section class="tool-section wide">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">任務規劃</p>
+                <h2>目標拆解器</h2>
+              </div>
+              <div class="button-row">
+                <button id="copyPlan" title="複製計畫">
+                  <i data-lucide="copy"></i>
+                </button>
+                <button id="downloadPlan" title="下載計畫">
+                  <i data-lucide="download"></i>
+                </button>
+              </div>
+            </div>
+            <div class="goal-form">
+              <input id="goalInput" type="text" placeholder="輸入目標，例如：建立 AI Agent 介紹網站並部署" />
+              <button id="buildPlan">
+                <i data-lucide="sparkles"></i>
+                <span>產生計畫</span>
+              </button>
+            </div>
+            <div id="planBoard" class="plan-board"></div>
+          </section>
+        </section>
+
+        <section class="view" data-view="files">
           <div class="tool-grid">
             <section class="tool-section">
-              <h2>滑鼠與鍵盤</h2>
-              <div class="input-row">
-                <label>X <input id="mouseX" type="number" value="400" /></label>
-                <label>Y <input id="mouseY" type="number" value="300" /></label>
-                <button id="moveMouse"><i data-lucide="move"></i><span>移動</span></button>
-                <button id="leftClick"><i data-lucide="mouse-pointer-click"></i><span>左鍵</span></button>
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">資料整理</p>
+                  <h2>檔案摘要</h2>
+                </div>
               </div>
-              <div class="input-row">
-                <input id="typeText" type="text" placeholder="輸入要打到目前焦點位置的文字" />
-                <button id="typeButton"><i data-lucide="keyboard"></i><span>輸入文字</span></button>
-              </div>
-              <div class="hotkeys">
-                <button data-hotkey="ctrl+c">Ctrl C</button>
-                <button data-hotkey="ctrl+v">Ctrl V</button>
-                <button data-hotkey="alt+tab">Alt Tab</button>
-                <button data-hotkey="win+left">Win Left</button>
-                <button data-hotkey="win+right">Win Right</button>
-              </div>
+              <label class="drop-zone" for="fileInput">
+                <i data-lucide="upload-cloud"></i>
+                <span>選擇文字、Markdown、CSV 或 JSON</span>
+                <input id="fileInput" type="file" accept=".txt,.md,.csv,.json,.html,.css,.js" />
+              </label>
+              <div id="fileSummary" class="result-box">尚未選擇檔案。</div>
             </section>
 
             <section class="tool-section">
-              <h2>命令執行</h2>
-              <textarea id="commandInput" rows="5" placeholder="PowerShell 命令，例如 Get-ChildItem"></textarea>
-              <div class="command-controls">
-                <label class="toggle">
-                  <input id="strictSafety" type="checkbox" checked />
-                  <span>嚴格安全模式</span>
-                </label>
-                <button id="previewCommand"><i data-lucide="shield-check"></i><span>檢查</span></button>
-                <button id="runCommand" class="danger"><i data-lucide="play"></i><span>確認執行</span></button>
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">研究輔助</p>
+                  <h2>搜尋草稿</h2>
+                </div>
               </div>
-              <pre id="commandOutput" class="terminal-output"></pre>
+              <div class="goal-form">
+                <input id="searchInput" type="search" placeholder="輸入要研究的主題" />
+                <button id="openSearch">
+                  <i data-lucide="external-link"></i>
+                  <span>搜尋</span>
+                </button>
+              </div>
+              <div id="searchBrief" class="result-box">搜尋結果會在新分頁開啟，這裡會保留研究主題。</div>
             </section>
           </div>
         </section>
 
-        <section class="view" id="searchView" data-view-panel="search">
-          <div class="tool-grid">
-            <section class="tool-section">
-              <h2>找資料</h2>
-              <div class="input-row">
-                <input id="webQuery" type="search" placeholder="搜尋網路資料" />
-                <button id="webSearchButton"><i data-lucide="search"></i><span>搜尋</span></button>
+        <section class="view" data-view="automations">
+          <section class="tool-section wide">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">自動化</p>
+                <h2>工作流程模板</h2>
               </div>
-              <div id="webResults" class="results"></div>
-            </section>
-            <section class="tool-section">
-              <h2>找檔案</h2>
-              <div class="input-row">
-                <input id="fileQuery" type="search" placeholder="檔名關鍵字" />
-                <button id="fileSearchButton"><i data-lucide="folder-search"></i><span>搜尋</span></button>
-              </div>
-              <div id="fileResults" class="results"></div>
-            </section>
-          </div>
+            </div>
+            <div id="workflowGrid" class="workflow-grid"></div>
+          </section>
         </section>
 
-        <section class="view" id="accessView" data-view-panel="access">
+        <section class="view" data-view="settings">
           <div class="tool-grid">
             <section class="tool-section">
-              <h2>輔助使用</h2>
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">偏好設定</p>
+                  <h2>介面與語音</h2>
+                </div>
+              </div>
               <div class="settings-list">
-                <label class="toggle"><input id="voiceReplies" type="checkbox" checked /><span>語音回覆</span></label>
-                <label class="toggle"><input id="largeText" type="checkbox" /><span>大型文字</span></label>
-                <label class="toggle"><input id="highContrast" type="checkbox" /><span>高對比</span></label>
-                <label class="toggle"><input id="reducedMotion" type="checkbox" /><span>減少動態</span></label>
-              </div>
-              <div class="input-row">
-                <textarea id="readText" rows="5" placeholder="貼上要朗讀或整理的文字"></textarea>
-                <button id="readAloud"><i data-lucide="volume-2"></i><span>朗讀</span></button>
+                <label class="toggle">
+                  <input id="voiceReplies" type="checkbox" checked />
+                  <span>語音回覆</span>
+                </label>
+                <label class="toggle">
+                  <input id="largeText" type="checkbox" />
+                  <span>放大文字</span>
+                </label>
+                <label class="toggle">
+                  <input id="highContrast" type="checkbox" />
+                  <span>高對比</span>
+                </label>
+                <label class="toggle">
+                  <input id="reducedMotion" type="checkbox" />
+                  <span>降低動畫</span>
+                </label>
               </div>
             </section>
-            <section class="tool-section">
-              <h2>工作流</h2>
-              <div class="workflow-list">
-                <button data-workflow="readClipboard"><i data-lucide="clipboard-check"></i><span>讀取剪貼簿並朗讀</span></button>
-                <button data-workflow="captureAndReview"><i data-lucide="scan-eye"></i><span>截圖並預覽</span></button>
-                <button data-workflow="focusMode"><i data-lucide="focus"></i><span>專注模式</span></button>
-              </div>
-              <div id="previewPane" class="preview-pane"></div>
-            </section>
-          </div>
-        </section>
 
-        <section class="view" id="settingsView" data-view-panel="settings">
-          <div class="tool-grid">
             <section class="tool-section">
-              <h2>AI 核心</h2>
-              <label>API Base <input id="apiBase" type="url" value="https://api.openai.com/v1" /></label>
-              <label>Model <input id="apiModel" type="text" placeholder="例如 gpt-4.1 或你的 OpenAI-compatible 模型" /></label>
-              <label>Speech Model <input id="sttModel" type="text" value="whisper-1" placeholder="例如 whisper-1" /></label>
-              <label>API Key <input id="apiKey" type="password" placeholder="只保存在此瀏覽器 localStorage" /></label>
-              <button id="saveSettings"><i data-lucide="save"></i><span>儲存設定</span></button>
-            </section>
-            <section class="tool-section">
-              <h2>系統資訊</h2>
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">系統資訊</p>
+                  <h2>目前環境</h2>
+                </div>
+              </div>
               <dl id="systemInfo" class="system-info"></dl>
             </section>
           </div>
         </section>
       </main>
     </div>
-
-    <dialog id="confirmDialog">
-      <form method="dialog">
-        <h2>確認操作</h2>
-        <p id="confirmText"></p>
-        <menu>
-          <button value="cancel">取消</button>
-          <button id="confirmOk" value="ok" class="danger">確認</button>
-        </menu>
-      </form>
-    </dialog>
   </body>
 </html>
