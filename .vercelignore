@@ -1,0 +1,12 @@
+.git
+.netlify
+.vercel
+node_modules
+__pycache__
+*.pyc
+*.pyo
+.netlify-dev.*.log
+agent_memory.json
+assistant_memory.json
+ai_assistant/assistant_memory.json
+電腦助手/agent_memory.json

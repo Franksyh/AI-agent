@@ -10,7 +10,9 @@ https://franksyh-ai-agent.netlify.app
 
 - 從純靜態頁升級為 Netlify 動態網站。
 - 新增跨裝置遠端連線：電腦版建立 session，手機版/網頁版用配對碼或 QR code 加入。
+- 新增 Vercel 版本的多人連線 API，可讓多位用戶加入同一個 session。
 - 遠端 session 使用 Netlify Blobs 保存裝置、心跳與指令事件。
+- Vercel 部署使用 Serverless Functions，提供 `/api/*` 動態端點與多人 session hub。
 - 新增 Netlify Functions API：`/api/state`、`/api/chat`、`/api/plan`、`/api/workflows`、`/api/brief`、`/api/remote`。
 - 聊天回覆、任務拆解、工作流程模板、檔案摘要會由伺服器端即時產生。
 - 前端保留瀏覽器備援模式，API 暫時不可用時仍能操作。
@@ -41,13 +43,19 @@ POST /api/brief
 POST /api/remote
 ```
 
+Vercel 相容 API 位於：
+
+```text
+api/[...route].js
+```
+
 ## 遠端連線
 
 1. 在電腦版或網頁版打開公開網站。
 2. 進入「遠端連線」分頁，選擇裝置類型並建立主控連線。
 3. 系統會產生配對碼、連線網址與 QR code。
 4. 手機版或另一個瀏覽器開啟連線網址，或輸入配對碼加入。
-5. 加入後可看到裝置清單、在線狀態，並透過指令佇列傳送文字、連線測試、開啟網址或確認請求。
+5. 多位用戶加入後可看到用戶/裝置清單、在線狀態，並透過指令佇列傳送文字、連線測試、開啟網址或確認請求。
 
 這個版本提供跨裝置遠端連線基礎設施；真正執行電腦控制時，仍建議由桌面端 Agent 保留人工確認點。
 
