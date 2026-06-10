@@ -51,6 +51,10 @@ button {
   cursor: pointer;
 }
 
+button[hidden] {
+  display: none;
+}
+
 button:hover {
   border-color: var(--blue);
 }
@@ -185,6 +189,19 @@ h3 {
   white-space: nowrap;
 }
 
+.mini-button {
+  min-height: 30px;
+  padding: 0 9px;
+  gap: 6px;
+  color: var(--blue);
+  background: #f4f8fc;
+}
+
+.mini-button svg {
+  width: 15px;
+  height: 15px;
+}
+
 .dot {
   width: 10px;
   height: 10px;
@@ -219,6 +236,7 @@ h3 {
 .tool-section,
 .metric-card,
 .capability-card,
+.platform-card,
 .workflow-card,
 .plan-column {
   border: 1px solid var(--line);
@@ -345,6 +363,8 @@ h3 {
 .quick-actions,
 .workflow-grid,
 .capability-grid,
+.platform-grid,
+.guide-actions,
 .metrics-row {
   display: grid;
   gap: 14px;
@@ -364,7 +384,7 @@ h3 {
 }
 
 .metrics-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 18px;
 }
 
@@ -404,6 +424,117 @@ h3 {
   margin-bottom: 0;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.guide-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.guide-hero {
+  background:
+    linear-gradient(120deg, rgba(34, 92, 159, 0.11), transparent 42%),
+    linear-gradient(280deg, rgba(36, 122, 90, 0.12), transparent 40%),
+    rgba(255, 255, 255, 0.95);
+}
+
+.guide-lead {
+  max-width: 980px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.guide-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.guide-actions button {
+  min-height: 54px;
+  justify-content: flex-start;
+  color: #fff;
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.platform-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.platform-card {
+  min-height: 168px;
+  padding: 18px;
+}
+
+.platform-card svg,
+.upgrade-grid svg {
+  width: 28px;
+  height: 28px;
+  color: var(--green);
+  margin-bottom: 14px;
+}
+
+.platform-card p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.agent-flow {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  list-style: none;
+  counter-reset: flow;
+}
+
+.agent-flow li {
+  min-height: 148px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  background: #fff;
+  counter-increment: flow;
+}
+
+.agent-flow li::before {
+  content: counter(flow);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--blue);
+  font-weight: 800;
+}
+
+.agent-flow span,
+.upgrade-grid span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.upgrade-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.upgrade-grid article {
+  min-height: 168px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  background: #fff;
 }
 
 .tool-grid {
@@ -786,12 +917,17 @@ h3 {
   .overview-layout,
   .tool-grid,
   .plan-board,
-  .remote-layout {
+  .remote-layout,
+  .agent-flow {
     grid-template-columns: 1fr;
   }
 
   .capability-grid,
-  .workflow-grid {
+  .workflow-grid,
+  .platform-grid,
+  .metrics-row,
+  .upgrade-grid,
+  .guide-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -823,6 +959,9 @@ h3 {
 
   .metrics-row,
   .capability-grid,
+  .platform-grid,
+  .guide-actions,
+  .upgrade-grid,
   .workflow-grid,
   .settings-list,
   .quick-actions {

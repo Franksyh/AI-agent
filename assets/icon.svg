@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Future Assistant icon">
+  <rect width="512" height="512" rx="112" fill="#225c9f"/>
+  <path d="M152 292c0-58 47-105 105-105s105 47 105 105v44c0 14-11 25-25 25H177c-14 0-25-11-25-25v-44Z" fill="#ffffff"/>
+  <path d="M197 198c8-44 39-76 60-76s52 32 60 76" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="218" cy="278" r="18" fill="#247a5a"/>
+  <circle cx="296" cy="278" r="18" fill="#247a5a"/>
+  <path d="M224 329c22 18 47 18 68 0" fill="none" stroke="#225c9f" stroke-width="20" stroke-linecap="round"/>
+  <path d="M112 214h44M356 214h44M257 82v48M117 378l36-26M397 378l-36-26" stroke="#dcecff" stroke-width="24" stroke-linecap="round"/>
+</svg>

@@ -111,9 +111,10 @@ function createState(context) {
   return {
     ok: true,
     dynamic: true,
+    provider: "netlify",
     app: "Future Assistant",
     runtime: "Netlify Functions + Blobs",
-    apiVersion: "2026-06-09.remote.1",
+    apiVersion: "2026-06-10.netlify.remote.pwa.2",
     requestId: getRequestId(context),
     serverTime: new Date().toISOString(),
     capabilities: {
@@ -122,9 +123,11 @@ function createState(context) {
       fileBriefing: true,
       workflowTemplates: true,
       remoteSessions: true,
+      multiUserRemote: true,
       mobileRemote: true,
       desktopRemote: true,
       webRemote: true,
+      pwaInstall: true,
       staticFallback: true,
     },
   };
@@ -470,6 +473,12 @@ function publicEvent(event) {
 function workflowTemplates() {
   return [
     {
+      icon: "sparkles",
+      title: "AI 智能助手升級",
+      text: "整合跨平台入口、任務規劃、多人遠端連線、文件摘要與安全確認。",
+      goal: "將產品升級為跨手機、電腦、網頁的 AI 智能助手，具備多人遠端連線、任務規劃、文件摘要與安全確認",
+    },
+    {
       icon: "radio-tower",
       title: "跨裝置遠端連線",
       text: "建立配對碼，讓手機、電腦與網頁版加入同一個 session。",
@@ -510,6 +519,15 @@ function workflowTemplates() {
 
 function detectIntent(message) {
   const lower = message.toLowerCase();
+  if (
+    message.includes("智能助手") ||
+    message.includes("超越") ||
+    message.includes("產品升級") ||
+    (message.includes("打造") && message.includes("助手")) ||
+    (lower.includes("ai") && message.includes("助手"))
+  ) {
+    return "assistant";
+  }
   if (message.includes("遠端") || message.includes("手機") || message.includes("電腦") || message.includes("網頁")) return "remote";
   if (lower.includes("github") || lower.includes("netlify") || message.includes("部署") || message.includes("同步")) return "deploy";
   if (message.includes("研究") || message.includes("搜尋") || message.includes("比較")) return "research";
@@ -525,6 +543,7 @@ function createReply(message, plan, mode) {
   const modeCopy = mode === "execute" ? "我會保留高風險確認點" : mode === "observe" ? "我會只提供建議與分析" : "我會先列計畫再等待確認";
 
   const intro = {
+    assistant: "我已把智能助手升級拆成核心定位、跨平台體驗、智能工作流、多人遠端與驗證成長。",
     remote: "我已把遠端連線拆成建立 session、跨裝置加入、同步狀態與安全控制。",
     deploy: "我已把發布任務拆成 GitHub 與 Netlify 的動態部署流程。",
     research: "我已把研究任務拆成問題定義、資料蒐集、比較整理與交付。",
@@ -539,6 +558,16 @@ function createReply(message, plan, mode) {
 function createPlan(goal) {
   const text = goal || "支援手機版、電腦版與網頁版遠端連線功能";
   const intent = detectIntent(text);
+
+  if (intent === "assistant") {
+    return [
+      { phase: "核心定位", steps: ["從聊天頁升級成能理解目標、規劃步驟、使用工具與驗證成果的智能助手", "保留觀察、確認、執行三種安全模式", "把手機、電腦、網頁整合成同一個入口"] },
+      { phase: "跨平台體驗", steps: ["手機版支援 QR code 加入 session 與 PWA 安裝", "電腦版作為主控端審核高風險操作", "網頁版免安裝使用動態 API 與多人連線"] },
+      { phase: "智能工作流", steps: ["任務規劃器輸出階段與待辦", "文件摘要器整理重點與待辦線索", "自動化模板重複執行常見工作"] },
+      { phase: "多人遠端", steps: ["每位用戶有獨立 token", "多人事件進入同一個指令佇列", "同步在線狀態、配對碼與遠端訊息"] },
+      { phase: "驗證成長", steps: ["檢查公開網址與 /api/state", "追蹤連線人數與任務步驟", "逐步加入真實工具串接與權限管理"] },
+    ];
+  }
 
   if (intent === "remote") {
     return [

@@ -4,10 +4,14 @@ Future Assistant 是一個動態 AI Agent 工作台，支援手機版、電腦�
 
 公開網站：
 
+https://future-assistant-jade.vercel.app
 https://franksyh-ai-agent.netlify.app
 
 ## 這次優化
 
+- 升級為「AI 智能助手工作台」，新增如何使用導覽頁。
+- 新增 PWA manifest、service worker 與 app icon，可在手機與電腦安裝成應用。
+- 新增智能助手升級工作流：核心定位、跨平台體驗、智能工作流、多人遠端與驗證成長。
 - 從純靜態頁升級為 Netlify 動態網站。
 - 新增跨裝置遠端連線：電腦版建立 session，手機版/網頁版用配對碼或 QR code 加入。
 - 新增 Vercel 版本的多人連線 API，可讓多位用戶加入同一個 session。
@@ -23,6 +27,15 @@ https://franksyh-ai-agent.netlify.app
 - 加入檔案摘要工具，支援文字、Markdown、CSV、JSON、HTML、CSS、JS。
 - 加入搜尋草稿、工作流程模板、語音輸入與無障礙設定。
 - Netlify 公開站會自動偵測動態 API，並在介面顯示 `Dynamic`。
+
+## 如何使用
+
+1. 打開 `https://future-assistant-jade.vercel.app`。
+2. 進入「如何使用」頁，選擇建立遠端 Session、產生智能助手計畫或安裝成 App。
+3. 電腦版可作為主控端，建立 session 並審核高風險操作。
+4. 手機版可掃 QR code 或輸入配對碼加入，傳送指令並查看狀態。
+5. 網頁版可免安裝使用任務規劃、檔案摘要、自動化模板與多人遠端連線。
+6. 若瀏覽器支援安裝，點右上角「安裝」即可把同一網站加入手機主畫面或電腦桌面。
 
 ## 動態 API
 

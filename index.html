@@ -7,7 +7,13 @@
       name="description"
       content="Future Assistant 是支援手機版、電腦版與網頁版遠端連線的動態 AI Agent 工作台。"
     />
-    <title>Future Assistant | 遠端 AI Agent 工作台</title>
+    <meta name="theme-color" content="#225c9f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Future AI" />
+    <title>Future Assistant | AI 智能助手工作台</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icon.svg" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="/app.js" defer></script>
@@ -17,6 +23,9 @@
       <aside class="side-rail" aria-label="主要功能">
         <button class="rail-button active" data-route="overview" title="工作台">
           <i data-lucide="layout-dashboard"></i>
+        </button>
+        <button class="rail-button" data-route="guide" title="如何使用">
+          <i data-lucide="map"></i>
         </button>
         <button class="rail-button" data-route="remote" title="遠端連線">
           <i data-lucide="radio-tower"></i>
@@ -39,12 +48,16 @@
         <header class="topbar">
           <div class="brand-block">
             <p class="eyebrow">Future Assistant</p>
-            <h1>遠端 AI Agent 工作台</h1>
+            <h1>AI 智能助手工作台</h1>
           </div>
           <div class="status-strip" aria-live="polite">
             <span id="connectionDot" class="dot"></span>
             <span id="connectionStatus">檢查連線中</span>
             <span id="clock"></span>
+            <button id="installApp" class="mini-button" type="button" title="安裝應用">
+              <i data-lucide="download"></i>
+              <span>安裝</span>
+            </button>
           </div>
         </header>
 
@@ -108,6 +121,10 @@
                   <i data-lucide="radio-tower"></i>
                   <span>遠端連線</span>
                 </button>
+                <button data-intent="agent-upgrade">
+                  <i data-lucide="sparkles"></i>
+                  <span>智能升級</span>
+                </button>
                 <button data-intent="github-netlify">
                   <i data-lucide="rocket"></i>
                   <span>發布網站</span>
@@ -128,7 +145,7 @@
             <article class="metric-card">
               <span>網站模式</span>
               <strong id="apiModeMetric">Dynamic</strong>
-              <small>Netlify Functions</small>
+              <small>雲端函式</small>
             </article>
             <article class="metric-card">
               <span>多人連線</span>
@@ -139,6 +156,11 @@
               <span>任務拆解</span>
               <strong id="planCount">0</strong>
               <small>待辦步驟</small>
+            </article>
+            <article class="metric-card">
+              <span>跨平台</span>
+              <strong>PWA</strong>
+              <small>手機 / 電腦 / 網頁</small>
             </article>
           </section>
 
@@ -164,6 +186,117 @@
               <p>每台裝置有自己的 token，session 可關閉，訊息透過後端保存。</p>
             </article>
           </section>
+        </section>
+
+        <section class="view" data-view="guide">
+          <div class="guide-layout">
+            <section class="tool-section wide guide-hero">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">如何使用</p>
+                  <h2>從聊天工具升級成 AI 智能助手</h2>
+                </div>
+                <span class="status-badge">跨平台就緒</span>
+              </div>
+              <p class="guide-lead">
+                Future Assistant 會把你的目標拆成計畫，串接動態 API、文件摘要、自動化模板與多人遠端連線，讓手機、電腦與網頁版都能加入同一個工作流程。
+              </p>
+              <div class="guide-actions">
+                <button type="button" data-guide-action="remote">
+                  <i data-lucide="radio-tower"></i>
+                  <span>建立遠端 Session</span>
+                </button>
+                <button type="button" data-guide-action="plan">
+                  <i data-lucide="list-checks"></i>
+                  <span>產生智能助手計畫</span>
+                </button>
+                <button type="button" data-guide-action="install">
+                  <i data-lucide="download"></i>
+                  <span>安裝成 App</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="platform-grid" aria-label="跨平台使用方式">
+              <article class="platform-card">
+                <i data-lucide="smartphone"></i>
+                <h3>手機版</h3>
+                <p>開啟網址或掃 QR code 加入 session，傳送指令、檢查回覆、接收狀態更新。</p>
+              </article>
+              <article class="platform-card">
+                <i data-lucide="monitor"></i>
+                <h3>電腦版</h3>
+                <p>建立主控連線，審核高風險操作，整理文件、網站發布與工作流程。</p>
+              </article>
+              <article class="platform-card">
+                <i data-lucide="globe-2"></i>
+                <h3>網頁版</h3>
+                <p>免安裝即可使用動態 API、任務規劃、多人指令佇列與檔案摘要。</p>
+              </article>
+            </section>
+
+            <section class="tool-section wide">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">Agent 流程</p>
+                  <h2>目標到執行的閉環</h2>
+                </div>
+              </div>
+              <ol class="agent-flow">
+                <li>
+                  <strong>理解目標</strong>
+                  <span>把一句話轉成可驗證的完成標準。</span>
+                </li>
+                <li>
+                  <strong>規劃步驟</strong>
+                  <span>產生階段、待辦、確認點與風險標記。</span>
+                </li>
+                <li>
+                  <strong>使用工具</strong>
+                  <span>結合搜尋草稿、文件摘要、遠端 session 與部署流程。</span>
+                </li>
+                <li>
+                  <strong>多人協作</strong>
+                  <span>手機、電腦、網頁用戶同步收發指令與狀態。</span>
+                </li>
+                <li>
+                  <strong>驗證交付</strong>
+                  <span>檢查 API、公開網址、任務結果與下一步行動。</span>
+                </li>
+              </ol>
+            </section>
+
+            <section class="tool-section wide">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">優化方向</p>
+                  <h2>超越一般聊天機器人的產品能力</h2>
+                </div>
+              </div>
+              <div class="upgrade-grid">
+                <article>
+                  <i data-lucide="brain-circuit"></i>
+                  <strong>任務記憶</strong>
+                  <span>保存目標、計畫、裝置與事件，讓工作可以接續。</span>
+                </article>
+                <article>
+                  <i data-lucide="shield-check"></i>
+                  <strong>安全確認</strong>
+                  <span>高影響操作保留人工確認與可追溯紀錄。</span>
+                </article>
+                <article>
+                  <i data-lucide="workflow"></i>
+                  <strong>自動化模板</strong>
+                  <span>把常見任務變成可重複執行的工作流。</span>
+                </article>
+                <article>
+                  <i data-lucide="cloud-cog"></i>
+                  <strong>雲端動態</strong>
+                  <span>透過 Vercel / Netlify API 支援即時規劃與遠端協作。</span>
+                </article>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section class="view" data-view="remote">

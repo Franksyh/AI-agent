@@ -6,6 +6,12 @@ const remoteStorageKey = "future-assistant-remote";
 
 const fallbackWorkflows = [
   {
+    icon: "sparkles",
+    title: "AI 智能助手升級",
+    text: "整合跨平台入口、任務規劃、多人遠端連線、文件摘要與安全確認。",
+    goal: "將產品升級為跨手機、電腦、網頁的 AI 智能助手，具備多人遠端連線、任務規劃、文件摘要與安全確認",
+  },
+  {
     icon: "radio-tower",
     title: "跨裝置遠端連線",
     text: "建立配對碼，讓手機、電腦與網頁版加入同一個 session。",
@@ -26,8 +32,8 @@ const fallbackWorkflows = [
   {
     icon: "rocket",
     title: "網站發布流程",
-    text: "檢查檔案、提交 GitHub、部署 Netlify、驗證公開網址。",
-    goal: "將目前資料夾同步至 GitHub 並部署到 Netlify，完成後回傳公開連結",
+    text: "檢查檔案、提交 GitHub、部署 Vercel / Netlify、驗證公開網址。",
+    goal: "將目前資料夾同步至 GitHub 並部署到 Vercel / Netlify，完成後回傳公開連結",
   },
   {
     icon: "file-check-2",
@@ -53,6 +59,7 @@ const state = {
   remoteHeartbeatTimer: null,
   remoteCursor: 0,
   remoteSession: null,
+  installPrompt: null,
   settings: {
     voiceReplies: true,
     largeText: false,
@@ -189,14 +196,17 @@ function renderConnection() {
 }
 
 function renderSystemInfo() {
+  const provider = state.apiInfo?.provider ? state.apiInfo.provider.toUpperCase() : "Cloud";
   const data = {
-    網站模式: state.apiOnline ? "Netlify 動態網站" : "瀏覽器備援模式",
+    網站模式: state.apiOnline ? `${provider} 動態網站` : "瀏覽器備援模式",
     API: state.apiInfo?.runtime || "未連線",
     版本: state.apiInfo?.apiVersion || "local-fallback",
     遠端連線: state.apiInfo?.capabilities?.remoteSessions ? "支援" : "未確認",
+    跨平台: "手機 / 電腦 / 網頁 / PWA",
     RequestID: state.apiInfo?.requestId || "無",
     伺服器時間: state.apiInfo?.serverTime ? formatDateTime(state.apiInfo.serverTime) : "無",
     GitHub: "Franksyh/AI-agent",
+    Vercel: "future-assistant-jade.vercel.app",
     Netlify: "franksyh-ai-agent.netlify.app",
   };
 
@@ -603,13 +613,31 @@ function renderWorkflows() {
 function handleQuickAction(intent) {
   const map = {
     remote: "支援手機版、電腦版與網頁版遠端連線功能",
-    "github-netlify": "將目前資料夾同步至 GitHub 並部署到 Netlify，完成後回傳公開連結",
+    "agent-upgrade": "將產品升級為跨手機、電腦、網頁的 AI 智能助手，具備多人遠端連線、任務規劃、文件摘要、自動化模板與安全確認",
+    "github-netlify": "將目前資料夾同步至 GitHub 並部署到 Vercel / Netlify，完成後回傳公開連結",
     research: "整理 AI Agent 產品趨勢，產生比較表與重點摘要",
     document: "摘要一份產品介紹文件，整理成簡報大綱",
   };
   $("#goalInput").value = map[intent] || "規劃一個 AI Agent 工作流程";
   if (intent === "remote") routeTo("remote");
   buildPlanFromInput();
+}
+
+async function handleGuideAction(action) {
+  if (action === "remote") {
+    routeTo("remote");
+    addRemoteEvent("系統", "可先建立主控連線，再讓手機或網頁用配對碼加入。");
+    return;
+  }
+
+  if (action === "install") {
+    await installApp();
+    return;
+  }
+
+  $("#goalInput").value =
+    "將 Future Assistant 打造成跨手機、電腦、網頁的 AI 智能助手，具備目標理解、工具使用、多人遠端連線、文件摘要、自動化與安全確認";
+  await buildPlanFromInput();
 }
 
 async function summarizeFile(file) {
@@ -649,7 +677,7 @@ function formatBrief(file, brief, dynamic) {
   const summary = brief.summary?.length ? brief.summary.map((item) => `- ${item}`).join("\n") : "無";
 
   return [
-    `模式：${dynamic ? "Netlify 動態摘要" : "瀏覽器本機摘要"}`,
+    `模式：${dynamic ? "雲端動態摘要" : "瀏覽器本機摘要"}`,
     `檔名：${file.name}`,
     `大小：${formatBytes(file.size)}`,
     `行數：${brief.lineCount}`,
@@ -714,6 +742,50 @@ function setupVoiceInput() {
   });
 }
 
+function setupPwa() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+
+  const installButton = $("#installApp");
+  if (installButton) {
+    const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
+    installButton.hidden = Boolean(standalone);
+    installButton.addEventListener("click", installApp);
+  }
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    if (installButton) installButton.hidden = false;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    state.installPrompt = null;
+    if (installButton) installButton.hidden = true;
+    addMessage("system", "Future Assistant 已安裝完成，之後可從手機或電腦桌面直接開啟。");
+  });
+}
+
+async function installApp() {
+  if (state.installPrompt) {
+    const promptEvent = state.installPrompt;
+    state.installPrompt = null;
+    promptEvent.prompt();
+    const choice = await promptEvent.userChoice.catch(() => null);
+    if (choice?.outcome === "accepted") {
+      addMessage("system", "安裝已開始。完成後可像 App 一樣從裝置桌面開啟。");
+    }
+    return;
+  }
+
+  routeTo("guide");
+  addMessage(
+    "system",
+    "此裝置可使用瀏覽器選單的加入主畫面或安裝功能。本站已加入 PWA manifest 與離線快取，手機、電腦與網頁可使用同一個入口。",
+  );
+}
+
 function setupEvents() {
   $$(".rail-button").forEach((button) => {
     button.addEventListener("click", () => routeTo(button.dataset.route));
@@ -742,6 +814,10 @@ function setupEvents() {
     button.addEventListener("click", () => handleQuickAction(button.dataset.intent));
   });
 
+  $$("[data-guide-action]").forEach((button) => {
+    button.addEventListener("click", () => handleGuideAction(button.dataset.guideAction));
+  });
+
   ["voiceReplies", "largeText", "highContrast", "reducedMotion"].forEach((id) => {
     $(`#${id}`).addEventListener("change", (event) => {
       state.settings[id] = event.target.checked;
@@ -765,10 +841,26 @@ function refreshIcons() {
 function createFallbackPlan(goal) {
   const text = goal.trim() || "支援手機版、電腦版與網頁版遠端連線功能";
   const lower = text.toLowerCase();
+  const assistant =
+    text.includes("智能助手") ||
+    text.includes("超越") ||
+    text.includes("產品升級") ||
+    (text.includes("打造") && text.includes("助手")) ||
+    (lower.includes("ai") && text.includes("助手"));
   const remote = text.includes("遠端") || text.includes("手機") || text.includes("電腦") || text.includes("網頁");
-  const deploy = lower.includes("github") || lower.includes("netlify") || text.includes("部署") || text.includes("同步");
+  const deploy = lower.includes("github") || lower.includes("netlify") || lower.includes("vercel") || text.includes("部署") || text.includes("同步");
   const research = text.includes("研究") || text.includes("搜尋") || text.includes("比較");
   const documentTask = text.includes("文件") || text.includes("摘要") || text.includes("簡報");
+
+  if (assistant) {
+    return [
+      { phase: "核心定位", steps: ["定義智能助手不是聊天頁，而是能理解目標、規劃、使用工具與驗證成果的工作台", "保留確認模式、執行模式與觀察模式", "建立跨平台一致入口"] },
+      { phase: "跨平台體驗", steps: ["手機版支援 QR code 與 PWA 安裝", "電腦版作為主控端審核高風險操作", "網頁版免安裝加入多人 session"] },
+      { phase: "智能工作流", steps: ["提供任務拆解器", "加入文件摘要與研究草稿", "用自動化模板重複執行常見任務"] },
+      { phase: "多人遠端", steps: ["每位用戶有獨立 token", "多人事件進入同一個指令佇列", "同步在線狀態與遠端訊息"] },
+      { phase: "驗證成長", steps: ["檢查動態 API 與公開網址", "追蹤完成率、連線數與任務步驟", "持續加入真實工具串接"] },
+    ];
+  }
 
   if (remote) {
     return [
@@ -783,8 +875,8 @@ function createFallbackPlan(goal) {
     return [
       { phase: "檢查", steps: ["確認工作區狀態", "檢查首頁、動態 API 與靜態資源", "排除不應上傳的本機檔案"] },
       { phase: "提交", steps: ["建立清楚的 commit", "推送到 GitHub main", "確認遠端 commit 與本機一致"] },
-      { phase: "部署", steps: ["使用既有 Netlify site", "部署 Netlify Functions 與前端檔案", "等待 production deploy ready"] },
-      { phase: "驗證", steps: ["檢查公開首頁 HTTP 200", "呼叫 /api/state 確認動態 API", "回傳 GitHub 與 Netlify 連結"] },
+      { phase: "部署", steps: ["使用既有 Vercel / Netlify site", "部署動態 API 與前端檔案", "等待 production deploy ready"] },
+      { phase: "驗證", steps: ["檢查公開首頁 HTTP 200", "呼叫 /api/state 確認動態 API", "回傳 GitHub 與公開網站連結"] },
     ];
   }
 
@@ -857,6 +949,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   applySettings();
   setupEvents();
   setupVoiceInput();
+  setupPwa();
   loadRemoteSession();
   refreshClock();
   setInterval(refreshClock, 1000);
@@ -864,13 +957,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   await checkDynamicApi();
   await loadWorkflows();
   await buildPlanFromInput();
-  routeTo(new URLSearchParams(location.search).has("session") ? "remote" : "overview");
+  const params = new URLSearchParams(location.search);
+  const requestedView = params.get("view");
+  const initialRoute = params.has("session") ? "remote" : requestedView && $(`[data-view="${requestedView}"]`) ? requestedView : "overview";
+  routeTo(initialRoute);
 
   addMessage(
     "system",
     state.apiOnline
-      ? "歡迎使用 Future Assistant。現在已連上 Netlify 動態 API，遠端連線、任務計畫與摘要會由伺服器即時產生。"
-      : "歡迎使用 Future Assistant。目前使用瀏覽器備援模式，部署後會自動切換到 Netlify 動態 API。",
+      ? `歡迎使用 Future Assistant。現在已連上 ${state.apiInfo?.runtime || "雲端動態 API"}，遠端連線、任務計畫與摘要會由伺服器即時產生。`
+      : "歡迎使用 Future Assistant。目前使用瀏覽器備援模式，部署後會自動切換到雲端動態 API。",
   );
   refreshIcons();
 });
