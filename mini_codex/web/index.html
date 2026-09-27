@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mini Codex · 你的 AI 工作夥伴</title><link rel="icon" href="robot.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="/" aria-label="Mini Codex 首頁"><span class="brand-icon">&gt;_</span><span>mini<span class="brand-light">codex</span><small>PERSONAL WORKSPACE</small></span></a>
+  <button id="new-chat" class="new-chat"><span>＋</span> 開始新對話 <kbd>⌘ N</kbd></button>
+  <button id="import-history" class="import-history">↓ 匯入 Codex 對話紀錄</button>
+  <button id="sources-button" class="import-history">◌ 開源更新審查</button>
+  <div class="section-label">你的對話 <span id="chat-count">0</span></div>
+  <nav id="history" aria-label="對話紀錄"></nav>
+  <div class="sidebar-bottom"><div class="local-label"><i></i> 在你的電腦上運作</div><p>把想法交給 AI，<br>一起完成下一件事。</p><a href="https://github.com/openai/codex" target="_blank" rel="noreferrer">由開源 Codex 驅動 ↗</a></div>
+</aside>
+<main>
+  <header><div class="project"><span class="folder-icon">▱</span><div><strong id="project-name">AI 工作空間</strong><small id="project-path">選擇資料夾，開始一起工作</small></div></div><div class="header-actions"><span id="connection" class="badge">連接中</span><button id="login" class="quiet">登入 Codex ↗</button><button id="mobile-new" class="quiet mobile-tools" aria-label="開始新對話">＋</button><button id="panel-button" class="quiet mobile-tools">任務</button><button id="settings-button" class="quiet">專案設定</button></div></header>
+  <div id="notice" class="notice" role="alert" hidden></div>
+  <section class="conversation" id="conversation" aria-label="聊天內容">
+    <div class="welcome" id="welcome"><div class="eyebrow"><span></span> YOUR EVERYDAY COPILOT</div><img src="robot.svg" width="112" height="112" alt="藍色 Mini 機器人"><h1>嗨，今天一起做點什麼？</h1><p>從一個想法開始。寫程式、理解專案，或把繁瑣的工作交給我。</p>
+    <div class="suggestions"><button data-prompt="請閱讀這個專案，解釋架構、主要功能，以及如何啟動。"><span class="tile-icon mint">⌘</span><strong>認識這個專案</strong><small>快速理解程式與檔案結構</small><b>↗</b></button><button data-prompt="請檢查這個專案，找出可能的錯誤，先解釋問題與修正建議。"><span class="tile-icon lilac">⌁</span><strong>幫我找出問題</strong><small>檢查程式，找出改善方向</small><b>↗</b></button><button data-prompt="我想新增一個功能。請先問我功能需求，再一起規劃實作。"><span class="tile-icon sand">✧</span><strong>把想法做出來</strong><small>一起規劃並實作新功能</small><b>↗</b></button></div>
+    <div class="welcome-note">從下方輸入需求，Mini 會即時回報進度。</div></div>
+    <div id="messages" class="messages" aria-live="polite"></div><div id="working" class="working" hidden><span class="pulse"></span> Mini 正在處理你的任務…</div>
+  </section>
+  <section id="approval" class="approval" hidden aria-label="操作核准"></section>
+  <div class="composer-area"><form id="compose" class="composer"><textarea id="prompt" rows="2" maxlength="32000" aria-label="傳送給 Mini 的訊息" placeholder="告訴 Mini 你想完成什麼…"></textarea><div class="composer-tools"><div><span class="mini-spark">✦</span><select id="mode" aria-label="工作模式"><option value="read-only">先分析 · 唯讀</option><option value="workspace-write">動手做 · 可修改專案</option></select><select id="model" aria-label="AI 模型"><option value="">Codex 預設模型</option></select></div><div><span class="key-hint">Enter 傳送</span><button id="stop" type="button" hidden>■ 停止</button><button id="send" type="submit" aria-label="傳送訊息">↑</button></div></div></form><div class="composer-foot"><span>Mini Codex · 個人 AI 助手</span><span>重要結果請再次確認 · Shift + Enter 換行</span></div></div>
+</main>
+<aside class="inspector"><div class="inspector-heading">任務面板 <button class="inspector-close" id="panel-close" aria-label="關閉任務面板">×</button><span>◉</span></div><div class="pet-card"><img src="robot.svg" width="72" height="72" alt="Mini"><strong id="pet-status">準備開始</strong><span id="pet-description">你的下一個想法，我陪你完成。</span></div><div class="section-label">工作計畫</div><ol id="plan"><li class="empty">任務開始後，計畫會顯示在這裡。</li></ol><div class="section-label activity-label">執行紀錄</div><div id="activity"><p class="empty">工具操作與檔案變更會同步顯示。</p></div><div class="inspector-tip"><span>✦</span><p>說明目標與預期結果，<br>能讓 Mini 更精準地幫忙。</p></div></aside>
+<dialog id="settings"><form method="dialog"><div class="dialog-title"><h2>專案設定</h2><button aria-label="關閉設定">×</button></div><label for="cwd">專案資料夾完整路徑</label><input id="cwd" placeholder="C:\Users\你\Documents\project"><p>新對話會使用這個資料夾。進行中的對話會保留原本的專案與權限。</p><div class="mode-explanation"><strong>先分析</strong><span>以唯讀模式理解專案。</span><strong>動手做</strong><span>允許修改專案；超出沙箱的操作由 Codex 提出核准。</span></div><button class="primary" value="save">儲存設定</button></form></dialog>
+<dialog id="sources"><form method="dialog"><div class="dialog-title"><h2>開源更新審查</h2><button aria-label="關閉">×</button></div><p>只追蹤受信任來源。先檢查授權與最新 commit，再下載到隔離資料夾；不會自動安裝或執行。</p><div id="source-list" class="source-list"></div><div class="dialog-actions"><button id="refresh-sources" type="button">檢查網路更新</button><button class="primary" value="close">完成</button></div></form></dialog>
+</body></html>

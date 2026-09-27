@@ -1,0 +1,56 @@
+# Mini Codex
+
+繁體中文的個人 Codex 工作台與 Windows 迷你懸浮機器人。這是自製用戶端，不是 OpenAI 官方桌面產品。
+
+## 啟動
+
+在專案根目錄雙擊 `Start-Mini-Codex.cmd`，開啟桌面工作台與機器人。
+雙擊 `Start-Mini-Web.cmd`，單獨啟動瀏覽器版。
+
+需要 Python 3.10 以上（桌面機器人需 Tcl/Tk）與 Codex 執行檔。沒有額外 Python 套件。
+桌面工作台使用 Microsoft Edge 的獨立應用程式視窗；找不到 Edge 時會使用預設瀏覽器。
+程式優先使用 PATH 中的 codex.exe，再尋找 Windows Codex 安裝目錄。
+其他位置可設定 `MINI_CODEX_BIN` 為執行檔的完整路徑。
+
+兩版使用同一份本機聊天紀錄。如果要同步使用同一個執行中的任務，請在機器人上按右鍵 →「開啟網頁版」。Windows 重複啟動時會開啟現有服務；若先啟動網頁版，請先結束它再啟動桌面版以顯示機器人。
+
+## 使用
+
+1. 程式會連接本機 Codex；尚未登入時點選「登入 Codex」。帳號憑證由 Codex 管理，Mini 不讀取或保存金鑰。
+2. 「專案設定」輸入要工作的資料夾完整路徑。
+3. 選擇「先分析」唯讀模式，或「動手做」允許修改專案的模式。
+4. 輸入需求，按 Enter 傳送；Shift + Enter 換行。
+5. 右側顯示模型提出的計畫、工具操作與檔案修改內容。需要額外權限時，可檢視要求並允許或拒絕。
+6. 按「停止」中斷任務。左側可重新開啟本程式的舊對話並繼續。
+7. 拖曳桌面小機器人移動位置，點擊開啟工作台；右鍵可開啟網頁版、複製連結或結束。
+8. 按左側「匯入 Codex 對話紀錄」可讀取現有 Codex thread 並複製到 Mini 的本機顯示紀錄；原始 Codex thread 不會被修改。
+9. 按「開源更新審查」手動查詢受信任開源庫的最新 commit。只有通過授權與來源門檻的候選版本能下載到隔離審查資料夾，仍需擁有者自行檢視與套用。
+
+## 資料與限制
+
+- 聊天顯示紀錄位於 `%LOCALAPPDATA%\MiniCodex\chats.json`；Codex 自己管理完整 thread 紀錄。
+- `MINI_CODEX_DATA` 可指定另一個本機資料目錄，測試時可避免影響正常紀錄。
+- 只監聽 `127.0.0.1`，以每次啟動產生的隨機權杖保護 API。這是本機網頁版，尚未提供跨裝置遠端或公開託管。
+- 目前一次執行一個任務。專案與權限在建立對話時固定，換專案請開新對話。
+- 純文字顯示模型輸出；不執行模型產生的 HTML。工具輸出可展開。
+- 支援命令與檔案變更核准。尚不支援進階 MCP 表單與額外權限授予；這些要求會拒絕，避免任務永久等待。額外問答目前不提供選項表單，請在聊天補充需求。
+- AI 回覆需要可用的 Codex 登入與網路，使用額度遵循你的 Codex 帳號。沒有離線模型或假回覆。
+- 關閉桌面工作台不會結束機器人；請使用機器人右鍵選單結束服務。
+- 擁有者是啟動 Mini 的 Windows 使用者，能讀取、編輯、核准與進行更新審查；公開／一般使用者設計為只能使用及讀取。本機服務不對外網開放，因此公開網站無法取得你的本機電腦控制權。
+- 桌面機器人右鍵可選擇「隱藏 Mini」或「結束 Mini」。隱藏後重新啟動 `Start-Mini-Codex.cmd` 即可重新顯示。
+
+## 開發與測試
+
+```powershell
+python -m unittest discover -s mini_codex/tests -v
+python mini_codex/server.py --no-open
+```
+
+## 開源來源
+
+- [OpenAI Codex](https://github.com/openai/codex)：Apache-2.0，Mini 透過已安裝的 CLI 連接，沒有複製或重新散佈其二進位程式。
+- [Codex App Server 文件](https://developers.openai.com/codex/app-server/)：stdio JSON-RPC 的初始化、聊天、串流與核准協定。
+- [解鎖 Codex 的運作機制](https://openai.com/zh-Hant/index/unlocking-the-codex-harness/)：使用者提供的設計參考。
+- Python 標準函式庫：HTTP 服務、子程序與 Tkinter 桌面介面。
+
+機器人圖示與介面為本專案原創繪製，未擷取附圖中的官方資產。

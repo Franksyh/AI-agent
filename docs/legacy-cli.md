@@ -1,3 +1,5 @@
+> 舊版說明：程式已整併至專案根目錄。以下指令請在專案根目錄執行。新版請參閱 [Mini Codex](../mini_codex/README.md)。
+
 # AI Agent 離線示範
 
 這是一個可以在本機執行的 Python AI agent 範例。它展示 agent 的四個核心能力：

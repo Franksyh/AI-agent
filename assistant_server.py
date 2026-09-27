@@ -24,7 +24,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
-STATIC_DIR = ROOT / "static"
+STATIC_DIR = ROOT
 SCREENSHOT_DIR = STATIC_DIR / "screenshots"
 MEMORY_FILE = ROOT / "agent_memory.json"
 DEFAULT_HOST = "127.0.0.1"
@@ -797,6 +797,17 @@ class AssistantHandler(SimpleHTTPRequestHandler):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
+
+    def translate_path(self, path: str) -> str:
+        # Share the canonical web assets without exposing source or memory files.
+        requested = urllib.parse.unquote(urllib.parse.urlparse(path).path)
+        allowed = {"/", "/index.html", "/app.js", "/styles.css", "/sw.js",
+                   "/manifest.webmanifest", "/assets/icon.svg"}
+        if requested in allowed:
+            return str(ROOT / ("index.html" if requested == "/" else requested.lstrip("/")))
+        if re.fullmatch(r"/screenshots/[A-Za-z0-9_-]+\.png", requested):
+            return str(ROOT / requested.lstrip("/"))
+        return str(ROOT / ".not-public" / "missing")
 
     def log_message(self, format: str, *args: Any) -> None:
         sys.stdout.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), format % args))

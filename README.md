@@ -1,4 +1,18 @@
-# Future Assistant
+# AI Agent · Mini Codex / Future Assistant
+
+## Mini Codex 桌面版與網頁版
+
+新增真正連接本機 Codex App Server 的繁體中文工作台：聊天串流、專案選擇、唯讀／可修改模式、工具紀錄、核准操作與對話保存。
+
+- 桌面版：雙擊 `Start-Mini-Codex.cmd`，包含獨立工作視窗與可拖曳的迷你機器人。
+- 網頁版：雙擊 `Start-Mini-Web.cmd`，在本機瀏覽器開啟。
+- 同時使用：機器人右鍵 →「開啟網頁版」，共用目前任務。
+- 詳細操作與環境需求：[Mini Codex 說明](mini_codex/README.md)。網頁版目前是本機服務，未公開部署。
+- 公開說明頁：`/mini-codex-cloud.html`。公開網頁只提供工作台與說明，整台電腦的讀取、編輯、控制與 Codex 對話仍只在擁有者本機代理上執行。
+
+舊版本的重複資料夾已整併到根目錄；使用說明保留於 `docs/legacy-cli.md` 與 `docs/legacy-desktop.md`。
+
+## Future Assistant 舊版
 
 Future Assistant 是一個動態 AI Agent 工作台，支援手機版、電腦版與網頁版遠端連線，用來展示「理解目標、拆解步驟、使用工具、交付結果」的完整流程。
 
