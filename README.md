@@ -25,7 +25,8 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - 語音輸入只會填入文字框，必須由使用者送出；可選擇朗讀回覆。
 - 80%、90%、100%、115%、130% 介面縮放，支援 `Ctrl/Cmd +`、`-`、`0`。
 - PWA 可安裝到手機或電腦。
-- 開源來源頁會讀取 GitHub 的公開中繼資料，顯示最新 commit、授權和快速篩選分數。
+- 開源來源頁會讀取 GitHub 的公開中繼資料，顯示授權、近期維護、封存狀態與公開社群指標。自動刷新使用五分鐘快取；按「重新檢查網路資料」會立即向 GitHub 讀取一次。
+- 快速分數是透明的公開中繼資料規則式篩選，不代表 AI 已審查程式碼。真正的 AI 程式碼審查仍由本機擁有者使用唯讀 Codex 進行。
 - 公開使用者是「使用與讀取」角色；免費／專業版選擇只是一項本機介面偏好，未連接付款服務，也不會提升權限。
 - Google、GitHub、ChatGPT/Codex、Gemini、Perplexity 和 Siri 的狀態會誠實顯示為可用、需設定或平台不支援；網站不蒐集 API 金鑰。
 
@@ -56,6 +57,14 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 
 Google OAuth、付費訂閱與真正的雲端聊天紀錄需要在部署平台另行設定身分驗證、資料庫、OAuth 用戶端與付款服務；程式不會把「未設定」顯示成已連結或已保護。
 
+### 連結 Google 帳號
+
+公開版已支援選用的 Google OAuth 瀏覽器彈出式流程。它只要求 `openid email profile`，用來確認帳號身分；不會要求 Google 密碼、Drive、Gmail 或其他 Google 資料權限，也不會把 access token 傳送或保存到 Mini Codex。
+
+1. 在自己的 Google Cloud 專案建立「Web application」OAuth Client，將下列公開來源加入 Authorized JavaScript origins：`https://future-assistant-jade.vercel.app` 與 `https://franksyh-ai-agent.netlify.app`。
+2. 在 Vercel 與／或 Netlify 的環境變數設定 `GOOGLE_CLIENT_ID`。這是可公開的 OAuth client ID，仍不要提交其他 OAuth 或 API secret。
+3. 重新部署後，開啟「AI 與帳號連結」即可按「連結 Google 帳號」。帳號名稱與 email 只存為目前瀏覽器的顯示資訊；重新整理後若要使用 Google 授權，瀏覽器會自行管理新的工作階段。
+
 ## API
 
 兩個部署平台提供相同的公開端點：
@@ -65,6 +74,7 @@ GET  /api/state
 GET  /api/workflows
 GET  /api/sources
 GET  /api/providers
+GET  /api/auth/google
 GET  /api/access
 POST /api/chat
 POST /api/plan
@@ -95,6 +105,8 @@ npx --yes netlify deploy --prod
 ```
 
 部署時不要提交帳號權杖、OAuth secret、API key 或本機 Mini 的資料目錄。
+
+`GOOGLE_CLIENT_ID` 僅在需要 Google 帳號確認時設定。未設定時，公開網站會誠實顯示為「需要設定」，不會出現失效的登入按鈕。
 
 ## 參考來源
 

@@ -8,6 +8,7 @@ const state = {
   currentId: null,
   plan: [],
   sources: [],
+  sourceStatus: null,
   providers: [],
   access: null,
   online: false,
@@ -165,9 +166,10 @@ function sourceScore(source) {
 
 function renderSources() {
   const sources = state.sources;
-  $("source-summary").textContent = sources.length
+  const baseSummary = sources.length
     ? `已載入 ${sources.length} 個受信任來源。公開資料是快速篩選，變更必須由本機擁有者審查。`
     : "目前無法讀取來源資料；仍可在本機 Mini 手動檢查。";
+  $("source-summary").textContent = baseSummary;
 
   const mini = $("source-mini-list");
   mini.replaceChildren(...sources.slice(0, 4).map((source) => {
@@ -199,6 +201,13 @@ function renderSources() {
     head.append(left, score);
     const description = document.createElement("small");
     description.textContent = safeText(source.description, safeText(source.note, "沒有可用更新訊息。"));
+    const signals = Array.isArray(source.qualitySignals) && source.qualitySignals.length
+      ? document.createElement("small")
+      : null;
+    if (signals) {
+      signals.className = "source-signals";
+      signals.textContent = `公開指標：${source.qualitySignals.join("、")}`;
+    }
     const links = document.createElement("div");
     links.className = "source-links";
     const checked = document.createElement("span");
@@ -214,10 +223,14 @@ function renderSources() {
       link.textContent = "開啟來源 ↗";
       links.append(link);
     }
-    card.append(head, description, links);
+    card.append(head, description);
+    if (signals) card.append(signals);
+    card.append(links);
     return card;
   }));
-  const generated = state.sourceGeneratedAt ? `上次載入：${formatDate(state.sourceGeneratedAt)}` : "";
+  const generated = state.sourceGeneratedAt
+    ? `上次載入：${formatDate(state.sourceGeneratedAt)}${state.sourceStatus?.cache === "refreshed" ? " · 已向 GitHub 重新讀取" : ""}`
+    : "";
   $("source-checked-at").textContent = generated;
 }
 
@@ -240,19 +253,108 @@ function renderProviders() {
       local_companion_required: "需要本機 Mini",
       public_metadata_only: "僅公開資料",
       not_configured: "需要設定",
+      oauth_ready: "可連結帳號",
       reference_only: "僅供參考",
       self_hosting_required: "需要自建環境",
     };
     status.textContent = safeText(provider.statusLabel, labels[provider.status] || safeText(provider.status, "需要設定"));
     head.append(left, status);
     card.append(head);
-    list.append(card);
+    if (provider.accountLink) {
+      const accountLink = document.createElement("small");
+      accountLink.className = "provider-account";
+      accountLink.textContent = safeText(provider.accountLink);
+      card.append(accountLink);
+    }
+    if (provider.id === "gemini" && provider.oauth?.enabled) {
+      const google = state.settings.googleAccount;
+      const detail = document.createElement("small");
+      detail.className = "provider-account";
+      detail.textContent = google?.email
+        ? `這個瀏覽器已確認：${google.name ? `${google.name} · ` : ""}${google.email}`
+        : "連結只確認 Google 帳號身分；Mini Codex 不保存 Google access token。";
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "provider-action";
+      action.textContent = google?.email ? "中斷 Google 連結" : "連結 Google 帳號";
+      action.addEventListener("click", () => {
+        if (state.settings.googleAccount?.email) {
+          delete state.settings.googleAccount;
+          persist();
+          renderProviders();
+          showNotice("已移除此瀏覽器顯示的 Google 帳號資訊。Google 的授權工作階段由瀏覽器管理。");
+          return;
+        }
+        connectGoogle(provider.oauth);
+      });
+      card.append(detail, action);
+    }
+    return card;
   }));
   if (!state.providers.length) {
     const item = document.createElement("p");
     item.className = "status-copy";
     item.textContent = "服務狀態暫時不可用。公開網站不會要求 API 金鑰。";
     list.append(item);
+  }
+}
+
+let googleIdentityPromise;
+
+function loadGoogleIdentity() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  if (googleIdentityPromise) return googleIdentityPromise;
+  googleIdentityPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => window.google?.accounts?.oauth2 ? resolve() : reject(new Error("Google 帳號服務沒有完成載入。"));
+    script.onerror = () => reject(new Error("無法載入 Google 帳號服務，請確認網路與瀏覽器沒有封鎖它。"));
+    document.head.append(script);
+  });
+  return googleIdentityPromise;
+}
+
+async function connectGoogle(oauth) {
+  if (!oauth?.enabled || !oauth.clientId) {
+    showNotice("Google OAuth 尚未在這個部署平台設定。請先設定 GOOGLE_CLIENT_ID。 ");
+    return;
+  }
+  try {
+    await loadGoogleIdentity();
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: oauth.clientId,
+      scope: oauth.scope || "openid email profile",
+      include_granted_scopes: true,
+      callback: async (tokenResponse) => {
+        if (tokenResponse?.error || !tokenResponse?.access_token) {
+          showNotice(tokenResponse?.error_description || "Google 帳號連結沒有完成。");
+          return;
+        }
+        try {
+          const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+            headers: { authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          if (!response.ok) throw new Error("Google 未回傳帳號資訊。");
+          const profile = await response.json();
+          if (!profile?.email) throw new Error("Google 帳號資訊缺少電子郵件。 ");
+          state.settings.googleAccount = {
+            email: safeText(profile.email),
+            name: safeText(profile.name),
+            connectedAt: new Date().toISOString(),
+          };
+          persist();
+          renderProviders();
+          showNotice("Google 帳號已在此瀏覽器確認。存取權杖只在目前瀏覽器工作階段使用，未交給 Mini Codex。 ");
+        } catch (error) {
+          showNotice(error.message || "Google 帳號資訊讀取失敗。 ");
+        }
+      },
+    });
+    tokenClient.requestAccessToken({ prompt: "consent" });
+  } catch (error) {
+    showNotice(error.message || "Google OAuth 尚未完成。 ");
   }
 }
 
@@ -294,10 +396,11 @@ async function request(path, options = {}) {
   return payload;
 }
 
-async function refreshCloudData() {
+async function refreshCloudData({ forceSources = false } = {}) {
+  const sourceQuery = forceSources ? `?refresh=1&_=${Date.now()}` : `?_=${Date.now()}`;
   const results = await Promise.allSettled([
     request(`/api/state?_=${Date.now()}`),
-    request(`/api/sources?_=${Date.now()}`),
+    request(`/api/sources${sourceQuery}`),
     request(`/api/providers?_=${Date.now()}`),
     request(`/api/access?_=${Date.now()}`),
   ]);
@@ -309,6 +412,7 @@ async function refreshCloudData() {
   if (sources.status === "fulfilled") {
     state.sources = Array.isArray(sources.value.sources) ? sources.value.sources : [];
     state.sourceGeneratedAt = sources.value.generatedAt;
+    state.sourceStatus = sources.value;
   }
   if (providers.status === "fulfilled") state.providers = Array.isArray(providers.value.providers) ? providers.value.providers : [];
   if (access.status === "fulfilled") state.access = access.value.access || access.value;
@@ -417,7 +521,21 @@ function wire() {
   $("close-inspector").addEventListener("click", closeMobilePanels);
   $("sources-button").addEventListener("click", () => $("sources-dialog").showModal());
   $("providers-button").addEventListener("click", () => $("providers-dialog").showModal());
-  $("refresh-sources").addEventListener("click", refreshCloudData);
+  $("refresh-sources").addEventListener("click", async () => {
+    const button = $("refresh-sources");
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = "正在重新檢查…";
+    try {
+      await refreshCloudData({ forceSources: true });
+      showNotice("已向 GitHub 重新檢查受信任來源。AI 程式碼審查請在本機 Mini 進行。");
+    } catch (error) {
+      showNotice(error.message || "來源更新暫時無法完成。");
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
   $("hide-mini").addEventListener("click", () => { state.settings.miniHidden = true; persist(); render(); });
   $("open-local-help").addEventListener("click", () => {
     showNotice("請在 Windows 執行 Start-Mini-Codex.cmd，登入 Codex 後由你核准讀取、編輯或電腦協助。公開網站無法取得這些權限。");

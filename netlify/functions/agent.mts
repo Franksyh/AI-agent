@@ -125,11 +125,15 @@ export default async (req, context) => {
     }
 
     if (req.method === "GET" && route === "sources") {
-      return jsonResponse(await createSourcesResponse(context));
+      return jsonResponse(await createSourcesResponse(context, url));
     }
 
     if (req.method === "GET" && route === "providers") {
       return jsonResponse(createProvidersResponse(context));
+    }
+
+    if (req.method === "GET" && route === "auth/google") {
+      return jsonResponse(createGoogleOAuthResponse(context));
     }
 
     if (req.method === "GET" && route === "access") {
@@ -242,7 +246,7 @@ function createState(context) {
     provider: "netlify",
     app: "Mini Codex",
     runtime: "Netlify Functions + Blobs",
-    apiVersion: "2026-09-27.netlify.mini-codex.access.1",
+    apiVersion: "2026-09-27.netlify.mini-codex.access.2",
     requestId: getRequestId(context),
     serverTime: new Date().toISOString(),
     access: accessSummary(),
@@ -263,10 +267,12 @@ function createState(context) {
       pwaInstall: true,
       sourceCatalog: true,
       sourceMetadataFromGitHub: true,
+      sourceForceRefresh: true,
+      publicMetadataQualityScore: true,
       providerCatalog: true,
       sourceAutoInstall: false,
       cloudComputerControl: false,
-      cloudAccountLinking: false,
+      cloudAccountLinking: googleOAuthConfig().enabled,
       staticFallback: true,
     },
   };
@@ -306,8 +312,52 @@ function createProvidersResponse(context) {
     generatedAt: new Date().toISOString(),
     requestId: getRequestId(context),
     note: "供應商清單描述目前可用的整合狀態，不表示服務已連結第三方帳號。",
-    providers: PROVIDER_CATALOG,
+    providers: providerCatalog(),
   };
+}
+
+function createGoogleOAuthResponse(context) {
+  return {
+    ok: true,
+    dynamic: true,
+    provider: "netlify",
+    generatedAt: new Date().toISOString(),
+    requestId: getRequestId(context),
+    googleOAuth: googleOAuthConfig(),
+  };
+}
+
+function providerCatalog() {
+  const googleOAuth = googleOAuthConfig();
+  return PROVIDER_CATALOG.map((provider) => {
+    if (provider.id !== "gemini") return provider;
+    if (!googleOAuth.enabled) return provider;
+    return {
+      ...provider,
+      status: "oauth_ready",
+      capability: "可在這個瀏覽器使用 Google OAuth 確認帳號；Gemini CLI 或 API 仍須由擁有者自行設定。",
+      accountLink: "可連結 Google 帳號。存取權杖只留在瀏覽器記憶體，不會傳送或保存到 Mini Codex 伺服器。",
+      oauth: googleOAuth,
+    };
+  });
+}
+
+function googleOAuthConfig() {
+  const clientId = cleanText(process.env.GOOGLE_CLIENT_ID, 240);
+  const validClientId = /^\d+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
+  return validClientId
+    ? {
+      enabled: true,
+      provider: "google",
+      clientId,
+      scope: "openid email profile",
+      flow: "browser_popup_token",
+      persistence: "瀏覽器工作階段；Mini Codex 不保存 Google access token。",
+    }
+    : {
+      enabled: false,
+      reason: "尚未在部署平台設定 GOOGLE_CLIENT_ID。",
+    };
 }
 
 function createAccessResponse(context) {
@@ -321,8 +371,8 @@ function createAccessResponse(context) {
   };
 }
 
-async function createSourcesResponse(context) {
-  const catalog = await getSourceCatalog();
+async function createSourcesResponse(context, url) {
+  const catalog = await getSourceCatalog({ force: url.searchParams.get("refresh") === "1" });
   return {
     ok: true,
     dynamic: true,
@@ -332,7 +382,7 @@ async function createSourcesResponse(context) {
     cache: catalog.cache,
     refreshAfterSeconds: Math.floor(SOURCE_CACHE_TTL_MS / 1000),
     policy: {
-      metadata: "僅向 GitHub Public API 讀取列出的受信任儲存庫中繼資料。",
+      metadata: "僅向 GitHub Public API 讀取列出的受信任儲存庫中繼資料；快速分數是公開中繼資料的規則式篩選，不是 AI 程式碼審查。",
       codeExecution: "不下載、安裝或執行任何候選來源的程式碼。",
       approval: "任何採用、下載或整合都必須由擁有者在本機審核後執行。",
     },
@@ -340,10 +390,12 @@ async function createSourcesResponse(context) {
   };
 }
 
-async function getSourceCatalog() {
-  if (sourceCache.value && sourceCache.expiresAt > Date.now()) {
+async function getSourceCatalog({ force = false } = {}) {
+  const now = Date.now();
+  if (sourceCache.value && sourceCache.expiresAt > now && !force) {
     return { ...sourceCache.value, cache: "memory" };
   }
+
 
   const settled = await Promise.allSettled(SOURCE_CATALOG.map(fetchGitHubSourceMetadata));
   const sources = settled.map((result, index) =>
@@ -373,6 +425,7 @@ async function fetchGitHubSourceMetadata(source) {
     if (!response.ok) throw new Error(`GitHub metadata request failed: ${response.status}`);
 
     const metadata = await response.json();
+    const quality = publicQualityScore(metadata);
     return {
       ...source,
       reviewStatus: "owner_review_required",
@@ -385,6 +438,12 @@ async function fetchGitHubSourceMetadata(source) {
       updatedAt: safeTimestamp(metadata.updated_at),
       archived: Boolean(metadata.archived),
       fork: Boolean(metadata.fork),
+      stargazersCount: Number(metadata.stargazers_count || 0),
+      forksCount: Number(metadata.forks_count || 0),
+      openIssuesCount: Number(metadata.open_issues_count || 0),
+      score: quality.score,
+      qualitySignals: quality.signals,
+      scoreMethod: "public_metadata_rule_based",
     };
   } catch {
     return fallbackSource(source);
@@ -406,7 +465,53 @@ function fallbackSource(source) {
     updatedAt: null,
     archived: null,
     fork: null,
+    stargazersCount: null,
+    forksCount: null,
+    openIssuesCount: null,
+    score: null,
+    qualitySignals: [],
+    scoreMethod: "unavailable",
   };
+}
+
+function publicQualityScore(metadata) {
+  let score = 0;
+  const signals = [];
+  const license = cleanText(metadata.license?.spdx_id, 120);
+  const pushedAt = Date.parse(metadata.pushed_at || "");
+  const ageDays = Number.isFinite(pushedAt) ? (Date.now() - pushedAt) / 86400000 : Infinity;
+  const stars = Number(metadata.stargazers_count || 0);
+
+  if (license && license !== "NOASSERTION") {
+    score += 25;
+    signals.push("有公開 SPDX 授權");
+  }
+  if (!metadata.archived) {
+    score += 15;
+    signals.push("未封存");
+  }
+  if (!metadata.fork) {
+    score += 10;
+    signals.push("非 fork 專案");
+  }
+  if (ageDays <= 90) {
+    score += 25;
+    signals.push("90 天內有更新");
+  } else if (ageDays <= 365) {
+    score += 15;
+    signals.push("一年內有更新");
+  }
+  if (stars >= 1000) {
+    score += 25;
+    signals.push("公開社群追蹤達 1,000+");
+  } else if (stars >= 100) {
+    score += 15;
+    signals.push("公開社群追蹤達 100+");
+  } else if (stars >= 10) {
+    score += 5;
+    signals.push("有公開社群追蹤");
+  }
+  return { score: Math.min(score, 100), signals };
 }
 
 function safeTimestamp(value) {

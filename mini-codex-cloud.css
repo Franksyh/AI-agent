@@ -147,6 +147,10 @@ dialog::backdrop { background: #17203745; backdrop-filter: blur(3px); }
 .source-card-head, .provider-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .source-card strong, .provider-card strong { display: block; font-size: 12px; }
 .source-card small, .provider-card small { display: block; margin-top: 5px; color: #8993a1; line-height: 1.55; font-size: 10px; }
+.source-card .source-signals { color: #6f897b; }
+.provider-card .provider-account { color: #78869a; }
+.provider-action { margin-top: 10px; padding: 7px 9px; border: 1px solid #cfd7f6; border-radius: 7px; color: var(--accent-ink); background: #f5f7ff; font-size: 10px; }
+.provider-action:hover { background: #e9edff; }
 .source-score { flex: none; padding: 4px 6px; border-radius: 12px; background: #edf6f1; color: #5b9274; font-size: 9px; }
 .source-links { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; color: #798596; font-size: 9px; }
 .source-links a { color: var(--accent-ink); }
