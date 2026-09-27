@@ -1,5 +1,120 @@
 import { getDeployStore, getStore } from "@netlify/blobs";
 
+const sourceCache = globalThis.__miniCodexSourceCache || {
+  expiresAt: 0,
+  value: null,
+};
+
+globalThis.__miniCodexSourceCache = sourceCache;
+
+const SOURCE_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_REMOTE_DEVICES = 8;
+const MEMBER_COMMAND_TYPES = new Set(["text", "ping", "request"]);
+const OWNER_COMMAND_TYPES = new Set(["text", "ping", "request", "open_url", "approval"]);
+
+const SOURCE_CATALOG = Object.freeze([
+  {
+    id: "openai-codex",
+    name: "OpenAI Codex",
+    repository: "openai/codex",
+    url: "https://github.com/openai/codex",
+    category: "coding agent",
+    note: "以公開儲存庫中繼資料供擁有者審查。",
+  },
+  {
+    id: "openai-gpt-oss",
+    name: "OpenAI gpt-oss",
+    repository: "openai/gpt-oss",
+    url: "https://github.com/openai/gpt-oss",
+    category: "open-weight model",
+    note: "模型需由擁有者自行選擇並在本機或受控環境部署。",
+  },
+  {
+    id: "google-gemini-cli",
+    name: "Google Gemini CLI",
+    repository: "google-gemini/gemini-cli",
+    url: "https://github.com/google-gemini/gemini-cli",
+    category: "coding agent",
+    note: "僅列為候選來源，不會代替使用者登入 Google 帳號。",
+  },
+  {
+    id: "perplexity-bumblebee",
+    name: "Perplexity Bumblebee",
+    repository: "perplexityai/bumblebee",
+    url: "https://github.com/perplexityai/bumblebee",
+    category: "research agent",
+    note: "以公開中繼資料追蹤，需由擁有者確認用途與授權。",
+  },
+  {
+    id: "apple-intelligence-cli",
+    name: "Apple Intelligence CLI",
+    repository: "onmyway133/apple-intelligence-cli",
+    url: "https://github.com/onmyway133/apple-intelligence-cli",
+    category: "Apple reference",
+    note: "僅作為 Apple 平台參考，不提供 Windows 上的 Siri 控制。",
+  },
+  {
+    id: "siri-ultra",
+    name: "Siri Ultra",
+    repository: "fatwang2/siri-ultra",
+    url: "https://github.com/fatwang2/siri-ultra",
+    category: "Apple reference",
+    note: "僅作為候選參考；整合前必須由擁有者審核。",
+  },
+]);
+
+const PROVIDER_CATALOG = Object.freeze([
+  {
+    id: "codex",
+    name: "OpenAI Codex",
+    status: "local_companion_required",
+    capability: "透過本機 Mini Codex companion 使用 Codex App Server。",
+    accountLink: "此公開 API 不持有 OpenAI 登入或 API 金鑰。",
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    status: "public_metadata_only",
+    capability: "來源端點只讀取受信任儲存庫的公開中繼資料。",
+    accountLink: "GitHub 帳號授權尚未在此公開服務設定。",
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    status: "not_configured",
+    capability: "可由使用者在自己的環境安裝 Gemini CLI 或設定受控 API。",
+    accountLink: "Google OAuth 尚未設定；服務不會要求或儲存密碼。",
+  },
+  {
+    id: "perplexity",
+    name: "Perplexity",
+    status: "not_configured",
+    capability: "需要擁有者自行設定 Perplexity API 憑證。",
+    accountLink: "此公開服務沒有 Perplexity 帳號連線。",
+  },
+  {
+    id: "apple",
+    name: "Apple Intelligence / Siri",
+    status: "reference_only",
+    capability: "Apple 專案僅列為來源參考；網頁服務不能控制 Siri 或 Apple 裝置。",
+    accountLink: "未連結 Apple 帳號。",
+  },
+  {
+    id: "gpt-oss",
+    name: "gpt-oss",
+    status: "self_hosting_required",
+    capability: "開放權重模型需要由擁有者自行準備符合需求的推論環境。",
+    accountLink: "此服務沒有代管模型或 GPU。",
+  },
+]);
+
+class ApiError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export default async (req, context) => {
   const url = new URL(req.url);
   const route = url.pathname.replace(/^\/api\/?/, "") || "state";
@@ -7,6 +122,18 @@ export default async (req, context) => {
   try {
     if (req.method === "GET" && route === "state") {
       return jsonResponse(createState(context));
+    }
+
+    if (req.method === "GET" && route === "sources") {
+      return jsonResponse(await createSourcesResponse(context));
+    }
+
+    if (req.method === "GET" && route === "providers") {
+      return jsonResponse(createProvidersResponse(context));
+    }
+
+    if (req.method === "GET" && route === "access") {
+      return jsonResponse(createAccessResponse(context));
     }
 
     if (req.method === "GET" && route === "workflows") {
@@ -74,12 +201,13 @@ export default async (req, context) => {
 
     return jsonResponse({ ok: false, error: `Unknown API route: ${route}` }, { status: 404 });
   } catch (error) {
+    const status = error instanceof ApiError ? error.status : 500;
     return jsonResponse(
       {
         ok: false,
         error: error instanceof Error ? error.message : "API 發生未預期錯誤",
       },
-      { status: 500 },
+      { status },
     );
   }
 };
@@ -112,11 +240,12 @@ function createState(context) {
     ok: true,
     dynamic: true,
     provider: "netlify",
-    app: "Future Assistant",
+    app: "Mini Codex",
     runtime: "Netlify Functions + Blobs",
-    apiVersion: "2026-06-10.netlify.remote.pwa.2",
+    apiVersion: "2026-09-27.netlify.mini-codex.access.1",
     requestId: getRequestId(context),
     serverTime: new Date().toISOString(),
+    access: accessSummary(),
     capabilities: {
       serverPlanning: true,
       dynamicChat: true,
@@ -124,10 +253,20 @@ function createState(context) {
       workflowTemplates: true,
       remoteSessions: true,
       multiUserRemote: true,
+      remoteSessionDurability: "netlify_blobs",
+      roleBasedRemote: true,
+      ownerCanCloseSession: true,
+      memberCommandsRestricted: true,
       mobileRemote: true,
       desktopRemote: true,
       webRemote: true,
       pwaInstall: true,
+      sourceCatalog: true,
+      sourceMetadataFromGitHub: true,
+      providerCatalog: true,
+      sourceAutoInstall: false,
+      cloudComputerControl: false,
+      cloudAccountLinking: false,
       staticFallback: true,
     },
   };
@@ -141,8 +280,142 @@ function cleanText(value, limit = 20000) {
   return String(value || "").trim().slice(0, limit);
 }
 
-function getRemoteStore() {
-  const deployContext = globalThis.Netlify?.context?.deploy?.context;
+function accessSummary() {
+  return {
+    owner: {
+      label: "owner",
+      assignment: "建立遠端 session 的裝置",
+      capabilities: ["read", "edit", "send_text", "send_ping", "send_request", "open_url", "request_approval", "close_session"],
+    },
+    member: {
+      label: "member",
+      assignment: "用配對碼加入的裝置",
+      capabilities: ["read", "send_text", "send_ping", "send_request"],
+      blocked: ["open_url", "request_approval", "close_session", "computer_control"],
+    },
+    enforcement: "角色與命令限制會在遠端 API 伺服器端驗證。",
+    authentication: "每個 session 裝置使用獨立 bearer token；此公開服務尚未設定帳號登入。",
+  };
+}
+
+function createProvidersResponse(context) {
+  return {
+    ok: true,
+    dynamic: true,
+    provider: "netlify",
+    generatedAt: new Date().toISOString(),
+    requestId: getRequestId(context),
+    note: "供應商清單描述目前可用的整合狀態，不表示服務已連結第三方帳號。",
+    providers: PROVIDER_CATALOG,
+  };
+}
+
+function createAccessResponse(context) {
+  return {
+    ok: true,
+    dynamic: true,
+    provider: "netlify",
+    generatedAt: new Date().toISOString(),
+    requestId: getRequestId(context),
+    access: accessSummary(),
+  };
+}
+
+async function createSourcesResponse(context) {
+  const catalog = await getSourceCatalog();
+  return {
+    ok: true,
+    dynamic: true,
+    provider: "netlify",
+    generatedAt: catalog.generatedAt,
+    requestId: getRequestId(context),
+    cache: catalog.cache,
+    refreshAfterSeconds: Math.floor(SOURCE_CACHE_TTL_MS / 1000),
+    policy: {
+      metadata: "僅向 GitHub Public API 讀取列出的受信任儲存庫中繼資料。",
+      codeExecution: "不下載、安裝或執行任何候選來源的程式碼。",
+      approval: "任何採用、下載或整合都必須由擁有者在本機審核後執行。",
+    },
+    sources: catalog.sources,
+  };
+}
+
+async function getSourceCatalog() {
+  if (sourceCache.value && sourceCache.expiresAt > Date.now()) {
+    return { ...sourceCache.value, cache: "memory" };
+  }
+
+  const settled = await Promise.allSettled(SOURCE_CATALOG.map(fetchGitHubSourceMetadata));
+  const sources = settled.map((result, index) =>
+    result.status === "fulfilled" ? result.value : fallbackSource(SOURCE_CATALOG[index]),
+  );
+  const value = {
+    generatedAt: new Date().toISOString(),
+    sources,
+  };
+  sourceCache.value = value;
+  sourceCache.expiresAt = Date.now() + SOURCE_CACHE_TTL_MS;
+  return { ...value, cache: "refreshed" };
+}
+
+async function fetchGitHubSourceMetadata(source) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${source.repository}`, {
+      headers: {
+        accept: "application/vnd.github+json",
+        "user-agent": "Mini-Codex-Source-Review",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`GitHub metadata request failed: ${response.status}`);
+
+    const metadata = await response.json();
+    return {
+      ...source,
+      reviewStatus: "owner_review_required",
+      metadataStatus: "live",
+      metadataSource: "github_public_api",
+      description: cleanText(metadata.description, 500),
+      defaultBranch: cleanText(metadata.default_branch, 120) || "unknown",
+      license: cleanText(metadata.license?.spdx_id, 120) || "NOASSERTION",
+      latestPushAt: safeTimestamp(metadata.pushed_at),
+      updatedAt: safeTimestamp(metadata.updated_at),
+      archived: Boolean(metadata.archived),
+      fork: Boolean(metadata.fork),
+    };
+  } catch {
+    return fallbackSource(source);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function fallbackSource(source) {
+  return {
+    ...source,
+    reviewStatus: "metadata_unavailable",
+    metadataStatus: "fallback",
+    metadataSource: "catalog_fallback",
+    description: "GitHub 公開中繼資料暫時無法讀取；請稍後重新整理後再審核。",
+    defaultBranch: "unknown",
+    license: "unknown",
+    latestPushAt: null,
+    updatedAt: null,
+    archived: null,
+    fork: null,
+  };
+}
+
+function safeTimestamp(value) {
+  const parsed = Date.parse(value || "");
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function getRemoteStore(context) {
+  const deployContext = context?.deploy?.context;
   if (deployContext === "production") {
     return getStore("future-assistant-remote", { consistency: "strong" });
   }
@@ -157,18 +430,19 @@ async function handleRemote(body, url, context) {
   if (action === "poll") return pollRemoteSession(body, context);
   if (action === "send") return sendRemoteCommand(body, context);
   if (action === "close") return closeRemoteSession(body, context);
-  throw new Error("未知的遠端連線操作");
+  throw new ApiError("未知的遠端連線操作", 400);
 }
 
 async function createRemoteSession(body, url, context) {
-  const store = getRemoteStore();
+  const store = getRemoteStore(context);
   const now = new Date().toISOString();
   const sessionId = crypto.randomUUID();
   const code = await createUniqueCode(store);
-  const device = createDevice(body, "host");
+  const device = createDevice(body, "owner");
   const session = {
     id: sessionId,
     code,
+    ownerDeviceId: device.id,
     status: "waiting",
     createdAt: now,
     updatedAt: now,
@@ -196,7 +470,7 @@ async function createRemoteSession(body, url, context) {
   return {
     ok: true,
     dynamic: true,
-    role: "host",
+    role: "owner",
     deviceId: device.id,
     token: device.token,
     cursor: session.sequence,
@@ -208,17 +482,27 @@ async function createRemoteSession(body, url, context) {
 }
 
 async function joinRemoteSession(body, context) {
-  const store = getRemoteStore();
+  const store = getRemoteStore(context);
   const code = cleanText(body.code, 16).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (!code) throw new Error("請提供配對碼");
+  if (!code) throw new ApiError("請提供配對碼", 400);
 
   const mapping = await store.get(codeKey(code), { type: "json" });
-  if (!mapping?.sessionId) throw new Error("找不到這組配對碼");
+  if (!mapping?.sessionId) throw new ApiError("找不到這組配對碼", 404);
 
-  const session = await loadSession(store, mapping.sessionId);
-  assertSessionOpen(session);
+  let session;
+  try {
+    session = await loadSession(store, mapping.sessionId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      await deletePairingCodeIfMatches(store, code, mapping.sessionId);
+    }
+    throw error;
+  }
+  await assertSessionOpen(store, session);
+  normalizeSessionRoles(session);
+  assertDeviceCapacity(session);
 
-  const device = createDevice(body, "guest");
+  const device = createDevice(body, "member");
   session.devices = upsertDevice(session.devices, device);
   session.status = "active";
   appendEvent(session, {
@@ -234,7 +518,7 @@ async function joinRemoteSession(body, context) {
   return {
     ok: true,
     dynamic: true,
-    role: "guest",
+    role: "member",
     deviceId: device.id,
     token: device.token,
     cursor: session.sequence,
@@ -245,7 +529,7 @@ async function joinRemoteSession(body, context) {
 }
 
 async function heartbeatRemoteSession(body, context) {
-  const { store, session, device } = await authorizedSession(body);
+  const { store, session, device } = await authorizedSession(body, context);
   device.lastSeen = new Date().toISOString();
   device.name = cleanText(body.deviceName, 80) || device.name;
   device.type = cleanText(body.deviceType, 20) || device.type;
@@ -263,10 +547,10 @@ async function heartbeatRemoteSession(body, context) {
 }
 
 async function pollRemoteSession(body, context) {
-  const { session, device } = await authorizedSession(body);
+  const { session, device } = await authorizedSession(body, context);
   const cursor = Number(body.cursor || 0);
   const events = session.events
-    .filter((event) => event.sequence > cursor && event.fromDeviceId !== device.id)
+    .filter((event) => event.sequence > cursor && event.fromDeviceId !== device.id && eventIsVisibleToDevice(event, device))
     .map(publicEvent);
 
   return {
@@ -281,15 +565,16 @@ async function pollRemoteSession(body, context) {
 }
 
 async function sendRemoteCommand(body, context) {
-  const { store, session, device } = await authorizedSession(body);
-  const commandType = cleanText(body.commandType || "text", 32);
-  const payload = sanitizePayload(body.payload || {});
+  const { store, session, device } = await authorizedSession(body, context);
+  const commandType = normalizeCommandType(body.commandType);
+  assertCommandAllowed(device, commandType);
+  const payload = sanitizePayload(body.payload || {}, commandType);
   const message = payload.text || commandType;
 
   appendEvent(session, {
     type: "command",
     commandType,
-    target: cleanText(body.target || "all", 32),
+    target: device.role === "member" ? "owner" : normalizeTarget(body.target),
     fromDeviceId: device.id,
     fromName: device.name,
     message,
@@ -308,7 +593,8 @@ async function sendRemoteCommand(body, context) {
 }
 
 async function closeRemoteSession(body, context) {
-  const { store, session, device } = await authorizedSession(body);
+  const { store, session, device } = await authorizedSession(body, context);
+  assertOwner(session, device);
   session.status = "closed";
   appendEvent(session, {
     type: "system",
@@ -329,17 +615,18 @@ async function closeRemoteSession(body, context) {
   };
 }
 
-async function authorizedSession(body) {
-  const store = getRemoteStore();
+async function authorizedSession(body, context) {
+  const store = getRemoteStore(context);
   const sessionId = cleanText(body.sessionId, 80);
   const token = cleanText(body.token, 120);
-  if (!sessionId || !token) throw new Error("缺少 session 或裝置 token");
+  if (!sessionId || !token) throw new ApiError("缺少 session 或裝置 token", 401);
 
   const session = await loadSession(store, sessionId);
-  assertSessionOpen(session);
+  await assertSessionOpen(store, session);
+  normalizeSessionRoles(session);
 
   const device = session.devices.find((item) => item.token === token);
-  if (!device) throw new Error("裝置驗證失敗");
+  if (!device) throw new ApiError("裝置驗證失敗", 401);
   return { store, session, device };
 }
 
@@ -349,7 +636,7 @@ async function createUniqueCode(store) {
     const existing = await store.get(codeKey(code), { type: "json" });
     if (!existing) return code;
   }
-  throw new Error("暫時無法產生配對碼，請再試一次");
+  throw new ApiError("暫時無法產生配對碼，請再試一次", 503);
 }
 
 function randomCode() {
@@ -373,6 +660,17 @@ function createDevice(body, role) {
   };
 }
 
+function normalizeSessionRoles(session) {
+  if (!session || !Array.isArray(session.devices)) return;
+  const owner = session.devices.find((device) => device.role === "owner" || device.role === "host") || session.devices[0];
+  if (!owner) return;
+
+  session.ownerDeviceId = session.ownerDeviceId || owner.id;
+  for (const device of session.devices) {
+    device.role = device.id === session.ownerDeviceId ? "owner" : "member";
+  }
+}
+
 function normalizeDeviceType(type) {
   const value = cleanText(type, 20);
   return ["mobile", "desktop", "web"].includes(value) ? value : "web";
@@ -387,7 +685,13 @@ function defaultDeviceName(type) {
 function upsertDevice(devices, device) {
   const next = devices.filter((item) => item.id !== device.id && item.token !== device.token);
   next.push(device);
-  return next.slice(-8);
+  return next;
+}
+
+function assertDeviceCapacity(session) {
+  if (session.devices.length >= MAX_REMOTE_DEVICES) {
+    throw new ApiError(`這個 session 最多可連線 ${MAX_REMOTE_DEVICES} 台裝置，請由擁有者先關閉或重建連線`, 409);
+  }
 }
 
 function appendEvent(session, event) {
@@ -403,16 +707,51 @@ function appendEvent(session, event) {
   session.events = session.events.slice(-100);
 }
 
-function sanitizePayload(payload) {
-  return {
-    text: cleanText(payload.text, 2000),
-    url: cleanText(payload.url, 1000),
-  };
+function normalizeCommandType(value) {
+  const commandType = cleanText(value || "text", 32).toLowerCase();
+  if (!OWNER_COMMAND_TYPES.has(commandType)) throw new ApiError("不支援的遠端命令類型", 400);
+  return commandType;
+}
+
+function assertCommandAllowed(device, commandType) {
+  if (device.role === "owner") return;
+  if (device.role !== "member" || !MEMBER_COMMAND_TYPES.has(commandType)) {
+    throw new ApiError("一般成員只能傳送文字、連線測試或請求訊息", 403);
+  }
+}
+
+function assertOwner(session, device) {
+  if (device.role !== "owner" || session.ownerDeviceId !== device.id) {
+    throw new ApiError("只有建立此 session 的擁有者可以關閉連線", 403);
+  }
+}
+
+function normalizeTarget(value) {
+  const target = cleanText(value || "all", 32);
+  return target === "owner" || target === "all" ? target : "all";
+}
+
+function sanitizePayload(payload, commandType) {
+  const text = cleanText(payload.text, 2000);
+  if (commandType !== "open_url") return { text, url: "" };
+
+  const url = normalizeHttpUrl(payload.url || text);
+  if (!url) throw new ApiError("開啟網址命令只接受有效的 http 或 https 網址", 400);
+  return { text, url };
+}
+
+function normalizeHttpUrl(value) {
+  try {
+    const url = new URL(cleanText(value, 1000));
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 async function loadSession(store, sessionId) {
   const session = await store.get(sessionKey(sessionId), { type: "json" });
-  if (!session) throw new Error("找不到遠端 session");
+  if (!session) throw new ApiError("找不到遠端 session", 404);
   return session;
 }
 
@@ -420,9 +759,48 @@ async function saveSession(store, session) {
   await store.setJSON(sessionKey(session.id), session);
 }
 
-function assertSessionOpen(session) {
-  if (session.status === "closed") throw new Error("這個 session 已關閉");
-  if (Date.parse(session.expiresAt) < Date.now()) throw new Error("這個 session 已過期");
+async function assertSessionOpen(store, session) {
+  if (!session || typeof session !== "object") throw new ApiError("找不到遠端 session", 404);
+  if (!Array.isArray(session.devices) || !Array.isArray(session.events)) {
+    throw new ApiError("遠端 session 資料無效", 409);
+  }
+  if (session.status === "closed") {
+    await purgeClosedOrExpiredSession(store, session);
+    throw new ApiError("這個 session 已關閉", 410);
+  }
+  const expiresAt = Date.parse(session.expiresAt);
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+    await purgeClosedOrExpiredSession(store, session);
+    throw new ApiError("這個 session 已過期", 410);
+  }
+}
+
+async function purgeClosedOrExpiredSession(store, session) {
+  const operations = [store.delete(sessionKey(session.id))];
+  const code = cleanText(session.code, 16).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code) {
+    try {
+      const mapping = await store.get(codeKey(code), { type: "json" });
+      if (!mapping || mapping.sessionId === session.id) operations.push(store.delete(codeKey(code)));
+    } catch {
+      // Keep the 410 response even if best-effort pairing-code cleanup cannot read the store.
+    }
+  }
+  await Promise.allSettled(operations);
+}
+
+async function deletePairingCodeIfMatches(store, code, sessionId) {
+  try {
+    const mapping = await store.get(codeKey(code), { type: "json" });
+    if (!mapping || mapping.sessionId === sessionId) await store.delete(codeKey(code));
+  } catch {
+    // A stale code is not allowed to turn a normal 404 response into a server error.
+  }
+}
+
+function eventIsVisibleToDevice(event, device) {
+  const target = event.target || "all";
+  return target === "all" || target === device.role || target === device.id || (target === "host" && device.role === "owner");
 }
 
 function sessionKey(sessionId) {
@@ -438,11 +816,18 @@ function publicSession(session) {
   return {
     id: session.id,
     code: session.code,
+    ownerDeviceId: session.ownerDeviceId,
     status: session.status,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     expiresAt: session.expiresAt,
     sequence: session.sequence,
+    access: {
+      ownerRole: "owner",
+      memberRole: "member",
+      memberCommands: Array.from(MEMBER_COMMAND_TYPES),
+      deviceLimit: MAX_REMOTE_DEVICES,
+    },
     devices: session.devices.map((device) => ({
       id: device.id,
       role: device.role,

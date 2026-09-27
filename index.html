@@ -2,511 +2,102 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="Future Assistant 是支援手機版、電腦版與網頁版遠端連線的動態 AI Agent 工作台。"
-    />
-    <meta name="theme-color" content="#225c9f" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Mini Codex Cloud：安全的跨裝置 AI 工作台；本機電腦操作只在擁有者的 Mini Codex 伴侶程式中進行。" />
+    <meta name="theme-color" content="#f8fafc" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Future AI" />
-    <title>Future Assistant | AI 智能助手工作台</title>
+    <meta name="apple-mobile-web-app-title" content="Mini Codex" />
+    <title>Mini Codex · AI 工作台</title>
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/assets/icon.svg" />
-    <link rel="stylesheet" href="/styles.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="/app.js" defer></script>
+    <link rel="icon" href="/assets/mini-robot.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/mini-robot.svg" />
+    <link rel="stylesheet" href="/mini-codex-cloud.css" />
+    <script src="/mini-codex-cloud.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
-      <aside class="side-rail" aria-label="主要功能">
-        <button class="rail-button active" data-route="overview" title="工作台">
-          <i data-lucide="layout-dashboard"></i>
-        </button>
-        <button class="rail-button" data-route="guide" title="如何使用">
-          <i data-lucide="map"></i>
-        </button>
-        <button class="rail-button" data-route="remote" title="遠端連線">
-          <i data-lucide="radio-tower"></i>
-        </button>
-        <button class="rail-button" data-route="planner" title="任務規劃">
-          <i data-lucide="list-checks"></i>
-        </button>
-        <button class="rail-button" data-route="files" title="資料整理">
-          <i data-lucide="folder-search"></i>
-        </button>
-        <button class="rail-button" data-route="automations" title="自動化">
-          <i data-lucide="workflow"></i>
-        </button>
-        <button class="rail-button" data-route="settings" title="設定">
-          <i data-lucide="settings-2"></i>
-        </button>
+      <aside class="sidebar" id="history-drawer" aria-label="Mini Codex 對話紀錄">
+        <div class="sidebar-head">
+          <a class="brand" href="/" aria-label="Mini Codex 首頁"><span class="brand-mark">&gt;_</span><span>mini <b>codex</b><small>PERSONAL AI WORKSPACE</small></span></a>
+          <button class="close-drawer" id="close-history" type="button" aria-label="關閉對話紀錄">×</button>
+        </div>
+        <button class="new-chat" id="new-chat" type="button"><span>＋</span> 新對話 <kbd>Ctrl N</kbd></button>
+        <button class="side-action" id="sources-button" type="button">◌ 開源更新與審查</button>
+        <button class="side-action" id="providers-button" type="button">⌁ AI 與帳號連結</button>
+        <div class="section-caption">此瀏覽器的對話 <span id="chat-count">0</span></div>
+        <nav id="history" class="history" aria-label="雲端工作台的本機對話紀錄"></nav>
+        <div class="sidebar-footer">
+          <div class="local-status"><i></i> 安全伴侶架構</div>
+          <p>公開工作台可規劃、查閱來源與跨裝置協作；檔案、Codex 對話與電腦控制保留在你的 Windows Mini。</p>
+          <a href="https://github.com/Franksyh/AI-agent" target="_blank" rel="noreferrer">查看公開原始碼 ↗</a>
+        </div>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
-          <div class="brand-block">
-            <p class="eyebrow">Future Assistant</p>
-            <h1>AI 智能助手工作台</h1>
+          <div class="workspace-title">
+            <button class="mobile-history" id="open-history" type="button" aria-label="開啟對話紀錄">☰</button>
+            <span class="folder">▱</span>
+            <div><strong>Mini Codex Cloud</strong><small id="connection-copy">正在連接公開工作台…</small></div>
           </div>
-          <div class="status-strip" aria-live="polite">
-            <span id="connectionDot" class="dot"></span>
-            <span id="connectionStatus">檢查連線中</span>
-            <span id="clock"></span>
-            <button id="installApp" class="mini-button" type="button" title="安裝應用">
-              <i data-lucide="download"></i>
-              <span>安裝</span>
-            </button>
+          <div class="top-actions">
+            <span class="badge local-badge" id="access-badge">訪客 · 使用與讀取</span>
+            <button class="icon-button" id="zoom-out" type="button" title="縮小介面" aria-label="縮小介面">A−</button>
+            <button class="icon-button" id="zoom-in" type="button" title="放大介面" aria-label="放大介面">A＋</button>
+            <button class="icon-button" id="voice-input" type="button" title="語音輸入" aria-label="語音輸入">◉</button>
+            <button class="quiet-button panel-button" id="panel-button" type="button">任務</button>
+            <button class="quiet-button" id="settings-button" type="button">設定</button>
           </div>
         </header>
 
-        <section class="view active" data-view="overview">
-          <div class="overview-layout">
-            <section class="assistant-panel">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">指令中心</p>
-                  <h2>把目標交給 Agent 拆成行動</h2>
-                </div>
-                <button id="voiceButton" class="icon-button" title="語音輸入">
-                  <i data-lucide="mic"></i>
-                </button>
-              </div>
-
-              <div id="messages" class="messages" aria-live="polite"></div>
-
-              <form id="chatForm" class="composer">
-                <textarea
-                  id="promptInput"
-                  rows="2"
-                  placeholder="例如：讓手機連到電腦版 Agent，遠端傳送指令並同步狀態"
-                ></textarea>
-                <button class="send-button" type="submit" title="送出">
-                  <i data-lucide="send"></i>
-                </button>
-              </form>
-            </section>
-
-            <aside class="execution-panel">
-              <div class="panel-title compact">
-                <div>
-                  <p class="eyebrow">執行模式</p>
-                  <h2>安全層級</h2>
-                </div>
-              </div>
-
-              <div class="segmented-group" role="radiogroup" aria-label="執行模式">
-                <label>
-                  <input type="radio" name="mode" value="observe" />
-                  <span>觀察</span>
-                </label>
-                <label>
-                  <input type="radio" name="mode" value="confirm" checked />
-                  <span>確認</span>
-                </label>
-                <label>
-                  <input type="radio" name="mode" value="execute" />
-                  <span>執行</span>
-                </label>
-              </div>
-
-              <div class="mode-card">
-                <strong id="modeTitle">確認模式</strong>
-                <p id="modeCopy">高影響操作會先列出計畫，再由你確認。</p>
-              </div>
-
-              <div class="quick-actions" aria-label="快速任務">
-                <button data-intent="remote">
-                  <i data-lucide="radio-tower"></i>
-                  <span>遠端連線</span>
-                </button>
-                <button data-intent="agent-upgrade">
-                  <i data-lucide="sparkles"></i>
-                  <span>智能升級</span>
-                </button>
-                <button data-intent="github-netlify">
-                  <i data-lucide="rocket"></i>
-                  <span>發布網站</span>
-                </button>
-                <button data-intent="research">
-                  <i data-lucide="search-check"></i>
-                  <span>整理資料</span>
-                </button>
-                <button data-intent="document">
-                  <i data-lucide="file-text"></i>
-                  <span>摘要文件</span>
-                </button>
-              </div>
-            </aside>
-          </div>
-
-          <section class="metrics-row" aria-label="產品狀態">
-            <article class="metric-card">
-              <span>網站模式</span>
-              <strong id="apiModeMetric">Dynamic</strong>
-              <small>雲端函式</small>
-            </article>
-            <article class="metric-card">
-              <span>多人連線</span>
-              <strong id="remoteMetric">0</strong>
-              <small>已連線用戶 / 裝置</small>
-            </article>
-            <article class="metric-card">
-              <span>任務拆解</span>
-              <strong id="planCount">0</strong>
-              <small>待辦步驟</small>
-            </article>
-            <article class="metric-card">
-              <span>跨平台</span>
-              <strong>PWA</strong>
-              <small>手機 / 電腦 / 網頁</small>
-            </article>
-          </section>
-
-          <section class="capability-grid" aria-label="Agent 能力">
-            <article class="capability-card">
-              <i data-lucide="smartphone"></i>
-              <h3>手機版</h3>
-              <p>用配對碼或 QR code 加入 session，傳送文字指令與檢查狀態。</p>
-            </article>
-            <article class="capability-card">
-              <i data-lucide="monitor"></i>
-              <h3>電腦版</h3>
-              <p>建立主控 session，保留人工確認點，接收遠端指令佇列。</p>
-            </article>
-            <article class="capability-card">
-              <i data-lucide="globe-2"></i>
-              <h3>網頁版</h3>
-              <p>任何瀏覽器都可加入同一個遠端工作台，不需要安裝 app。</p>
-            </article>
-            <article class="capability-card">
-              <i data-lucide="shield-check"></i>
-              <h3>安全連線</h3>
-              <p>每台裝置有自己的 token，session 可關閉，訊息透過後端保存。</p>
-            </article>
-          </section>
-        </section>
-
-        <section class="view" data-view="guide">
-          <div class="guide-layout">
-            <section class="tool-section wide guide-hero">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">如何使用</p>
-                  <h2>從聊天工具升級成 AI 智能助手</h2>
-                </div>
-                <span class="status-badge">跨平台就緒</span>
-              </div>
-              <p class="guide-lead">
-                Future Assistant 會把你的目標拆成計畫，串接動態 API、文件摘要、自動化模板與多人遠端連線，讓手機、電腦與網頁版都能加入同一個工作流程。
-              </p>
-              <div class="guide-actions">
-                <button type="button" data-guide-action="remote">
-                  <i data-lucide="radio-tower"></i>
-                  <span>建立遠端 Session</span>
-                </button>
-                <button type="button" data-guide-action="plan">
-                  <i data-lucide="list-checks"></i>
-                  <span>產生智能助手計畫</span>
-                </button>
-                <button type="button" data-guide-action="install">
-                  <i data-lucide="download"></i>
-                  <span>安裝成 App</span>
-                </button>
-              </div>
-            </section>
-
-            <section class="platform-grid" aria-label="跨平台使用方式">
-              <article class="platform-card">
-                <i data-lucide="smartphone"></i>
-                <h3>手機版</h3>
-                <p>開啟網址或掃 QR code 加入 session，傳送指令、檢查回覆、接收狀態更新。</p>
-              </article>
-              <article class="platform-card">
-                <i data-lucide="monitor"></i>
-                <h3>電腦版</h3>
-                <p>建立主控連線，審核高風險操作，整理文件、網站發布與工作流程。</p>
-              </article>
-              <article class="platform-card">
-                <i data-lucide="globe-2"></i>
-                <h3>網頁版</h3>
-                <p>免安裝即可使用動態 API、任務規劃、多人指令佇列與檔案摘要。</p>
-              </article>
-            </section>
-
-            <section class="tool-section wide">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">Agent 流程</p>
-                  <h2>目標到執行的閉環</h2>
-                </div>
-              </div>
-              <ol class="agent-flow">
-                <li>
-                  <strong>理解目標</strong>
-                  <span>把一句話轉成可驗證的完成標準。</span>
-                </li>
-                <li>
-                  <strong>規劃步驟</strong>
-                  <span>產生階段、待辦、確認點與風險標記。</span>
-                </li>
-                <li>
-                  <strong>使用工具</strong>
-                  <span>結合搜尋草稿、文件摘要、遠端 session 與部署流程。</span>
-                </li>
-                <li>
-                  <strong>多人協作</strong>
-                  <span>手機、電腦、網頁用戶同步收發指令與狀態。</span>
-                </li>
-                <li>
-                  <strong>驗證交付</strong>
-                  <span>檢查 API、公開網址、任務結果與下一步行動。</span>
-                </li>
-              </ol>
-            </section>
-
-            <section class="tool-section wide">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">優化方向</p>
-                  <h2>超越一般聊天機器人的產品能力</h2>
-                </div>
-              </div>
-              <div class="upgrade-grid">
-                <article>
-                  <i data-lucide="brain-circuit"></i>
-                  <strong>任務記憶</strong>
-                  <span>保存目標、計畫、裝置與事件，讓工作可以接續。</span>
-                </article>
-                <article>
-                  <i data-lucide="shield-check"></i>
-                  <strong>安全確認</strong>
-                  <span>高影響操作保留人工確認與可追溯紀錄。</span>
-                </article>
-                <article>
-                  <i data-lucide="workflow"></i>
-                  <strong>自動化模板</strong>
-                  <span>把常見任務變成可重複執行的工作流。</span>
-                </article>
-                <article>
-                  <i data-lucide="cloud-cog"></i>
-                  <strong>雲端動態</strong>
-                  <span>透過 Vercel / Netlify API 支援即時規劃與遠端協作。</span>
-                </article>
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" data-view="remote">
-          <div class="remote-layout">
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">遠端連線</p>
-                  <h2>建立或加入 Session</h2>
-                </div>
-                <span id="remoteStatusBadge" class="status-badge">未連線</span>
-              </div>
-
-              <div class="remote-controls">
-                <label>
-                  裝置名稱
-                  <input id="deviceName" type="text" placeholder="例如：Frank 的 iPhone" />
-                </label>
-                <label>
-                  裝置類型
-                  <select id="deviceType">
-                    <option value="desktop">電腦版</option>
-                    <option value="mobile">手機版</option>
-                    <option value="web">網頁版</option>
-                  </select>
-                </label>
-                <button id="createSession">
-                  <i data-lucide="plus-circle"></i>
-                  <span>建立主控連線</span>
-                </button>
-              </div>
-
-              <div class="join-row">
-                <input id="joinCode" type="text" placeholder="輸入配對碼" autocomplete="one-time-code" />
-                <button id="joinSession">
-                  <i data-lucide="log-in"></i>
-                  <span>加入</span>
-                </button>
-              </div>
-
-              <div class="session-card">
-                <div>
-                  <span>配對碼</span>
-                  <strong id="pairCode">尚未建立</strong>
-                </div>
-                <button id="copyJoinLink" title="複製連線網址">
-                  <i data-lucide="copy"></i>
-                </button>
-              </div>
-
-              <div class="qr-panel">
-                <img id="qrImage" alt="遠端連線 QR code" />
-                <div>
-                  <span>連線網址</span>
-                  <p id="joinLink">建立 session 後會產生網址。</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">用戶 / 裝置</p>
-                  <h2>多人連線狀態</h2>
-                </div>
-              </div>
-              <div id="deviceList" class="device-list"></div>
-            </section>
-
-            <section class="tool-section wide">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">遠端指令</p>
-                  <h2>訊息與指令佇列</h2>
-                </div>
-              </div>
-              <div class="remote-command-row">
-                <select id="commandType">
-                  <option value="text">文字指令</option>
-                  <option value="ping">連線測試</option>
-                  <option value="open_url">開啟網址</option>
-                  <option value="approval">請求確認</option>
-                </select>
-                <input id="remoteCommand" type="text" placeholder="輸入要送到其他裝置的內容" />
-                <button id="sendRemoteCommand">
-                  <i data-lucide="send"></i>
-                  <span>送出</span>
-                </button>
-              </div>
-              <div id="remoteEvents" class="event-log"></div>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" data-view="planner">
-          <section class="tool-section wide">
-            <div class="panel-title">
-              <div>
-                <p class="eyebrow">任務規劃</p>
-                <h2>目標拆解器</h2>
-              </div>
-              <div class="button-row">
-                <button id="copyPlan" title="複製計畫">
-                  <i data-lucide="copy"></i>
-                </button>
-                <button id="downloadPlan" title="下載計畫">
-                  <i data-lucide="download"></i>
-                </button>
-              </div>
+        <div class="notice" id="notice" hidden role="alert"></div>
+        <section class="conversation" id="conversation" aria-label="Mini Codex 對話">
+          <div class="welcome" id="welcome">
+            <div class="eyebrow"><i></i> MINI CODEX · PUBLIC COMPANION</div>
+            <img src="/assets/mini-robot.svg" width="112" height="112" alt="藍色 Mini Codex 機器人" />
+            <h1>嗨，今天想完成什麼？</h1>
+            <p>用一句話開始，Mini 會即時整理工作計畫。需要讀取、編輯或操作你的 Windows 電腦時，改由擁有者的本機 Mini 核准。</p>
+            <div class="suggestions">
+              <button type="button" data-prompt="請幫我規劃這個專案的功能、檔案結構與驗證步驟。"><span class="tile-icon mint">⌘</span><strong>理解一個專案</strong><small>建立架構與風險清單</small><b>↗</b></button>
+              <button type="button" data-prompt="請為 Mini Codex 設計一個安全的開源更新審查流程。"><span class="tile-icon lilac">⌁</span><strong>審查開源更新</strong><small>先評估，再交給擁有者</small><b>↗</b></button>
+              <button type="button" data-prompt="請把我的想法拆成可執行的任務，標記需要確認的步驟。"><span class="tile-icon sand">✧</span><strong>把想法做出來</strong><small>規劃、執行、驗證</small><b>↗</b></button>
             </div>
-            <div class="goal-form">
-              <input id="goalInput" type="text" placeholder="輸入目標，例如：建立跨手機與電腦的遠端連線" />
-              <button id="buildPlan">
-                <i data-lucide="sparkles"></i>
-                <span>產生計畫</span>
-              </button>
-            </div>
-            <div id="planBoard" class="plan-board"></div>
-          </section>
-        </section>
-
-        <section class="view" data-view="files">
-          <div class="tool-grid">
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">資料整理</p>
-                  <h2>檔案摘要</h2>
-                </div>
-              </div>
-              <label class="drop-zone" for="fileInput">
-                <i data-lucide="upload-cloud"></i>
-                <span>選擇文字、Markdown、CSV 或 JSON</span>
-                <input id="fileInput" type="file" accept=".txt,.md,.csv,.json,.html,.css,.js" />
-              </label>
-              <div id="fileSummary" class="result-box">尚未選擇檔案。</div>
-            </section>
-
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">研究輔助</p>
-                  <h2>搜尋草稿</h2>
-                </div>
-              </div>
-              <div class="goal-form">
-                <input id="searchInput" type="search" placeholder="輸入要研究的主題" />
-                <button id="openSearch">
-                  <i data-lucide="external-link"></i>
-                  <span>搜尋</span>
-                </button>
-              </div>
-              <div id="searchBrief" class="result-box">搜尋結果會在新分頁開啟，這裡會保留研究主題。</div>
-            </section>
+            <p class="welcome-note">語音輸入只會填入文字框，送出前由你確認。</p>
           </div>
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <div id="working" class="working" hidden><span></span> Mini 正在整理你的工作計畫…</div>
         </section>
 
-        <section class="view" data-view="automations">
-          <section class="tool-section wide">
-            <div class="panel-title">
-              <div>
-                <p class="eyebrow">自動化</p>
-                <h2>工作流程模板</h2>
-              </div>
+        <div class="composer-wrap">
+          <form class="composer" id="compose">
+            <textarea id="prompt" rows="2" maxlength="12000" placeholder="告訴 Mini 你想完成什麼…" aria-label="傳送給 Mini 的訊息"></textarea>
+            <div class="composer-tools">
+              <div class="mode-picker"><span>✦</span><select id="mode" aria-label="工作模式"><option value="observe">先分析 · 唯讀</option><option value="confirm" selected>規劃 · 等待確認</option></select></div>
+              <div><span class="key-hint">Enter 傳送</span><button class="send" type="submit" aria-label="傳送">↑</button></div>
             </div>
-            <div id="workflowGrid" class="workflow-grid"></div>
-          </section>
-        </section>
-
-        <section class="view" data-view="settings">
-          <div class="tool-grid">
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">偏好設定</p>
-                  <h2>介面與語音</h2>
-                </div>
-              </div>
-              <div class="settings-list">
-                <label class="toggle">
-                  <input id="voiceReplies" type="checkbox" checked />
-                  <span>語音回覆</span>
-                </label>
-                <label class="toggle">
-                  <input id="largeText" type="checkbox" />
-                  <span>放大文字</span>
-                </label>
-                <label class="toggle">
-                  <input id="highContrast" type="checkbox" />
-                  <span>高對比</span>
-                </label>
-                <label class="toggle">
-                  <input id="reducedMotion" type="checkbox" />
-                  <span>降低動畫</span>
-                </label>
-              </div>
-            </section>
-
-            <section class="tool-section">
-              <div class="panel-title">
-                <div>
-                  <p class="eyebrow">系統資訊</p>
-                  <h2>目前環境</h2>
-                </div>
-              </div>
-              <dl id="systemInfo" class="system-info"></dl>
-            </section>
-          </div>
-        </section>
+          </form>
+          <div class="composer-foot"><span>Mini Codex Cloud · 公開工作台</span><span>Shift + Enter 換行</span></div>
+        </div>
       </main>
+
+      <aside class="inspector" id="inspector" aria-label="任務與更新面板">
+        <div class="inspector-title"><span>任務面板</span><button id="close-inspector" type="button" aria-label="關閉任務面板">×</button><i>◉</i></div>
+        <div class="pet-card"><img src="/assets/mini-robot.svg" width="64" height="64" alt="Mini" /><div><strong id="pet-status">準備開始</strong><span id="pet-copy">你的下一個想法，我陪你完成。</span></div></div>
+        <div class="tabs" role="tablist"><button class="tab active" type="button" data-tab="plan">工作計畫</button><button class="tab" type="button" data-tab="updates">更新</button><button class="tab" type="button" data-tab="access">權限</button></div>
+        <section class="tab-panel active" data-panel="plan"><ol id="plan" class="plan"><li class="empty">送出需求後，計畫會顯示在這裡。</li></ol><div class="activity-heading">對話狀態</div><p class="status-copy" id="session-status">這些紀錄儲存在此瀏覽器；不會匯入你的 Codex 對話。</p></section>
+        <section class="tab-panel" data-panel="updates"><p class="status-copy" id="source-summary">正在讀取受信任的開源來源…</p><div id="source-mini-list" class="mini-list"></div><button class="outline-button" id="refresh-sources" type="button">重新檢查網路資料</button></section>
+        <section class="tab-panel" data-panel="access"><div id="access-panel" class="access-panel"></div><button class="outline-button" id="open-local-help" type="button">了解本機伴侶權限</button></section>
+      </aside>
     </div>
+
+    <div class="mini-float" id="mini-float" aria-label="Mini Codex 懸浮助手">
+      <img src="/assets/mini-robot.svg" width="54" height="54" alt="Mini Codex" />
+      <div><b>Mini 在線</b><span>公開工作台</span></div>
+      <button id="hide-mini" type="button" title="隱藏 Mini" aria-label="隱藏 Mini">×</button>
+    </div>
+
+    <dialog id="sources-dialog"><form method="dialog" class="dialog-card"><div class="dialog-heading"><div><p class="eyebrow">TRUSTED OPEN SOURCE</p><h2>開源更新與審查</h2></div><button aria-label="關閉">×</button></div><p>公開來源資料從 GitHub 讀取。授權、近期維護和適配度只作快速篩選；真正的 AI 程式碼審查、下載與套用，只在擁有者的本機 Mini 執行。</p><div id="source-list" class="source-list"></div><div class="dialog-actions"><span id="source-checked-at"></span><button class="primary" value="close">完成</button></div></form></dialog>
+    <dialog id="providers-dialog"><form method="dialog" class="dialog-card"><div class="dialog-heading"><div><p class="eyebrow">INTEGRATION HUB</p><h2>AI 與帳號連結</h2></div><button aria-label="關閉">×</button></div><p>公開網站不會要求或保存你的 API 金鑰。已完成 OAuth 或本機設定的服務才會顯示為可用。</p><div id="provider-list" class="provider-list"></div><div class="dialog-actions"><a href="https://github.com/Franksyh/AI-agent" target="_blank" rel="noreferrer">查看設定說明 ↗</a><button class="primary" value="close">完成</button></div></form></dialog>
+    <dialog id="settings-dialog"><form method="dialog" class="dialog-card"><div class="dialog-heading"><div><p class="eyebrow">PREFERENCES</p><h2>工作台設定</h2></div><button aria-label="關閉">×</button></div><label for="scale">介面縮放</label><select id="scale"><option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option></select><label class="toggle"><input id="speech-output" type="checkbox" /><span>朗讀 Mini 回覆</span></label><label class="toggle"><input id="show-mini" type="checkbox" checked /><span>顯示懸浮 Mini</span></label><label for="plan-choice">公開版方案</label><select id="plan-choice"><option value="free">免費版 · 規劃與閱讀</option><option value="pro">專業版 · 介面預覽</option></select><p class="small-note">方案選擇只儲存在這個瀏覽器，尚未連接付款服務。它不會取得本機檔案、電腦控制或擁有者權限。</p><div class="dialog-actions"><button class="primary" value="save">儲存設定</button></div></form></dialog>
   </body>
 </html>

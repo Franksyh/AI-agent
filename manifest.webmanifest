@@ -1,18 +1,19 @@
+
 {
-  "name": "Future Assistant",
-  "short_name": "Future AI",
-  "description": "跨手機、電腦、網頁的 AI 智能助手工作台。",
+  "name": "Mini Codex",
+  "short_name": "Mini Codex",
+  "description": "安全的公開 AI 工作台；本機 Mini Codex 保留檔案、對話與電腦操作的擁有者核准。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#eef2f5",
-  "theme_color": "#225c9f",
+  "background_color": "#f8fafc",
+  "theme_color": "#f8fafc",
   "lang": "zh-Hant",
   "orientation": "any",
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/assets/icon.svg",
+      "src": "/assets/mini-robot.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -20,16 +21,16 @@
   ],
   "shortcuts": [
     {
-      "name": "遠端連線",
-      "short_name": "遠端",
-      "url": "/?view=remote",
-      "description": "建立或加入多人遠端 session"
+      "name": "新對話",
+      "short_name": "對話",
+      "url": "/",
+      "description": "開啟 Mini Codex 工作台"
     },
     {
-      "name": "任務規劃",
-      "short_name": "規劃",
-      "url": "/?view=planner",
-      "description": "把目標拆成可執行計畫"
+      "name": "開源更新",
+      "short_name": "更新",
+      "url": "/#updates",
+      "description": "檢視受信任的開源來源"
     }
   ]
 }

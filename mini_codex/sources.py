@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import json
 from pathlib import Path
+import re
+import shutil
 import subprocess
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -22,6 +24,11 @@ TRUSTED_SOURCES = (
     ("Apple Intelligence CLI", "onmyway133/apple-intelligence-cli", "MIT", "Apple-focused CLI reference"),
     ("Siri Ultra", "fatwang2/siri-ultra", "MIT", "Voice assistant reference"),
 )
+TRUSTED_BY_REPOSITORY = {item[1]: item for item in TRUSTED_SOURCES}
+PERSISTED_FIELDS = {
+    "default_branch", "latest_commit", "latest_message", "url",
+    "checked_at", "status", "review", "license",
+}
 
 
 def utc_now() -> str:
@@ -58,12 +65,29 @@ class SourceManager:
         self.candidates = self._load()
 
     def _load(self) -> list[Candidate]:
+        candidates = {repository: Candidate(*entry) for repository, entry in TRUSTED_BY_REPOSITORY.items()}
         if self.path.exists():
             try:
-                return [Candidate(**item) for item in json.loads(self.path.read_text(encoding="utf-8"))]
+                saved = json.loads(self.path.read_text(encoding="utf-8"))
+                if not isinstance(saved, list):
+                    raise ValueError("Candidate data must be a list")
+                for item in saved:
+                    if not isinstance(item, dict):
+                        continue
+                    candidate = candidates.get(item.get("repository"))
+                    if candidate is None:
+                        continue
+                    # Repository identity, name and purpose are hard-coded.
+                    # Local cached data may retain only review metadata.
+                    for key in PERSISTED_FIELDS:
+                        if key in item:
+                            setattr(candidate, key, item[key])
+                return [candidates[entry[1]] for entry in TRUSTED_SOURCES]
             except (json.JSONDecodeError, OSError, TypeError):
                 pass
-        return [Candidate(*item) for item in TRUSTED_SOURCES]
+            except ValueError:
+                pass
+        return [candidates[entry[1]] for entry in TRUSTED_SOURCES]
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +130,7 @@ class SourceManager:
         # read-only thread; this gate prevents ambiguous licensing from passing.
         allowed_licenses = {"Apache-2.0", "MIT", "BSD-3-Clause", "ISC"}
         license_ok = candidate.license in allowed_licenses
-        commit_ok = bool(candidate.latest_commit and len(candidate.latest_commit) >= 7)
+        commit_ok = bool(candidate.latest_commit and re.fullmatch(r"[0-9a-fA-F]{40}", candidate.latest_commit))
         decision = "recommend_owner_review" if license_ok and commit_ok else "hold"
         candidate.review = {
             "decision": decision,
@@ -128,19 +152,59 @@ class SourceManager:
         candidate = self._find(repository)
         if candidate.status != "owner_review":
             raise ValueError("請先完成來源檢查與審查")
-        target = staging_root / repository.replace("/", "__")
+        if not candidate.latest_commit or not re.fullmatch(r"[0-9a-fA-F]{40}", candidate.latest_commit):
+            raise ValueError("候選版本沒有可驗證的完整 commit，請重新檢查來源")
+        target = (staging_root / repository.replace("/", "__")).resolve()
+        root = staging_root.resolve()
+        if root not in target.parents:
+            raise ValueError("隔離審查資料夾無效")
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
             raise ValueError("這個候選版本已在審查資料夾，請先檢視後再決定")
-        subprocess.run(
-            ["git", "clone", "--depth", "1", "--branch", candidate.default_branch,
-             f"https://github.com/{repository}.git", str(target)],
-            check=True, timeout=120, capture_output=True, text=True,
-        )
+        try:
+            # Fetch and check out the reviewed immutable SHA, rather than the
+            # potentially moved default branch. Nothing from the candidate is
+            # executed or installed.
+            subprocess.run(["git", "init", "--quiet", str(target)], check=True, timeout=30, capture_output=True, text=True)
+            subprocess.run(["git", "-C", str(target), "remote", "add", "origin", f"https://github.com/{repository}.git"],
+                           check=True, timeout=30, capture_output=True, text=True)
+            subprocess.run(["git", "-C", str(target), "fetch", "--depth", "1", "origin", candidate.latest_commit],
+                           check=True, timeout=120, capture_output=True, text=True)
+            subprocess.run(["git", "-C", str(target), "checkout", "--detach", "--quiet", "FETCH_HEAD"],
+                           check=True, timeout=30, capture_output=True, text=True)
+            head = subprocess.run(["git", "-C", str(target), "rev-parse", "HEAD"],
+                                  check=True, timeout=30, capture_output=True, text=True).stdout.strip()
+            if head.lower() != candidate.latest_commit.lower():
+                raise ValueError("下載內容與已審查的 commit 不一致")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+            # The directory was created in the verified staging root above.
+            shutil.rmtree(target, ignore_errors=True)
+            raise ValueError("無法下載已審查版本，請確認網路與 Git 後重試。") from error
+        except Exception:
+            shutil.rmtree(target, ignore_errors=True)
+            raise
         candidate.status = "staged_for_owner"
         self.save()
         return {"repository": repository, "path": str(target), "commit": candidate.latest_commit,
                 "message": "已下載到隔離審查資料夾，尚未安裝或執行。"}
+
+    def staged_path(self, repository: str, staging_root: Path) -> tuple[Candidate, Path]:
+        """Return only an already verified, isolated candidate directory.
+
+        Callers use this before asking Codex to inspect source text.  It never
+        resolves a browser-provided path and it never returns a candidate that
+        has not passed the fixed-SHA staging step.
+        """
+        candidate = self._find(repository)
+        if candidate.status != "staged_for_owner":
+            raise ValueError("請先下載候選版本到隔離審查資料夾")
+        root = staging_root.resolve()
+        target = (root / repository.replace("/", "__")).resolve()
+        if root not in target.parents or not target.is_dir():
+            raise ValueError("隔離審查資料夾不存在，請重新下載候選版本")
+        if not candidate.latest_commit or not re.fullmatch(r"[0-9a-fA-F]{40}", candidate.latest_commit):
+            raise ValueError("候選版本缺少可驗證的完整 commit")
+        return candidate, target
 
     def _find(self, repository: str) -> Candidate:
         item = next((c for c in self.candidates if c.repository == repository), None)
