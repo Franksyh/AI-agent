@@ -290,7 +290,33 @@ class Desktop:
 
 
 if __name__ == '__main__':
-    server = start()
-    desktop = Desktop(server)
-    desktop.open_app()
-    desktop.root.mainloop()
+    if os.environ.get('MINI_CODEX_SMOKE_TEST') == '1':
+        from urllib.request import Request, urlopen
+
+        server = start()
+        try:
+            with urlopen(server.origin + '/', timeout=10) as response:
+                page = response.read().decode('utf-8')
+                if response.status != 200 or '<title>Mini Codex' not in page:
+                    raise RuntimeError('桌面工作台首頁未能從封裝資源載入')
+            for path in ('/app.js', '/style.css', '/robot.svg'):
+                with urlopen(server.origin + path, timeout=10) as response:
+                    if response.status != 200 or not response.read():
+                        raise RuntimeError(f'桌面工作台資源無法載入：{path}')
+            request = Request(
+                server.origin + '/api/state',
+                headers={'Authorization': 'Bearer ' + server.token},
+            )
+            with urlopen(request, timeout=10) as response:
+                state = json.loads(response.read().decode('utf-8'))
+                if response.status != 200 or not state.get('defaultCwd'):
+                    raise RuntimeError('擁有者工作區狀態未能正常啟動')
+        finally:
+            server.assistant.bridge.close()
+            server.shutdown()
+            server.server_close()
+    else:
+        server = start()
+        desktop = Desktop(server)
+        desktop.open_app()
+        desktop.root.mainloop()

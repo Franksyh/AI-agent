@@ -13,6 +13,7 @@ jobs:
   package:
     name: Build portable Windows desktop package
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -67,6 +68,16 @@ jobs:
           Compress-Archive -Path (Join-Path $bundle "*") -DestinationPath "dist/MiniCodex-Windows.zip" -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath "dist/MiniCodex-Windows.zip" -PathType Leaf)) {
             throw "Windows ZIP was not created"
+          }
+
+      - name: Smoke test frozen Windows executable
+        shell: pwsh
+        run: |
+          $env:MINI_CODEX_DATA = Join-Path $PWD "build/smoke-data"
+          $env:MINI_CODEX_SMOKE_TEST = "1"
+          & (Join-Path $PWD "dist/MiniCodex/MiniCodex.exe")
+          if ($LASTEXITCODE -ne 0) {
+            throw "Frozen Mini Codex failed its local HTTP startup test (exit $LASTEXITCODE)"
           }
 
       - name: Upload Windows package
