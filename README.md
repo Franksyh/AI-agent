@@ -14,6 +14,7 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - Vercel：<https://future-assistant-jade.vercel.app>
 - Netlify：<https://franksyh-ai-agent.netlify.app>
 - GitHub：<https://github.com/Franksyh/AI-agent>
+- Windows 本機 Mini ZIP：<https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip>
 
 舊的 `/mini-codex-cloud.html` 會自動導向新版首頁。
 
