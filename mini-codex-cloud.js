@@ -667,19 +667,32 @@ function wire() {
     }
   });
   $("hide-mini").addEventListener("click", () => { state.settings.miniHidden = true; persist(); render(); });
-  $("install-app").addEventListener("click", async () => {
-    if (!installPrompt) { $("install-dialog").showModal(); return; }
-    installPrompt.prompt();
-    await installPrompt.userChoice;
-    installPrompt = null;
-    $("install-app").textContent = "安裝說明";
+  $("install-app").addEventListener("click", () => {
+    const dialog = $("install-dialog");
+    if (dialog && !dialog.open) dialog.showModal();
   });
+  const nativeInstallButton = $("install-pwa-now");
+  if (nativeInstallButton) {
+    nativeInstallButton.hidden = !installPrompt;
+    nativeInstallButton.addEventListener("click", async () => {
+      const promptEvent = installPrompt;
+      if (!promptEvent) return;
+      installPrompt = null;
+      nativeInstallButton.hidden = true;
+      $("install-dialog").close();
+      promptEvent.prompt();
+      await promptEvent.userChoice;
+      $("install-app").textContent = "安裝說明";
+    });
+  }
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     installPrompt = event;
+    if (nativeInstallButton) nativeInstallButton.hidden = false;
   });
   window.addEventListener("appinstalled", () => {
     installPrompt = null;
+    if (nativeInstallButton) nativeInstallButton.hidden = true;
     $("install-app").textContent = "已安裝";
   });
   $("open-local-help").addEventListener("click", () => {

@@ -747,36 +747,21 @@ function setupPwa() {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
-  const installButton = $("#install-app");
-  const installDialog = $("#install-dialog");
-  const nativeInstallButton = $("#install-pwa-now");
+  const installButton = $("#installApp");
   if (installButton) {
     const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
     installButton.hidden = Boolean(standalone);
-    installButton.addEventListener("click", () => {
-      if (installDialog && !installDialog.open) installDialog.showModal();
-    });
-  }
-  if (nativeInstallButton) {
-    nativeInstallButton.hidden = !state.installPrompt;
-    nativeInstallButton.addEventListener("click", async () => {
-      installDialog?.close();
-      await installApp();
-    });
+    installButton.addEventListener("click", installApp);
   }
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     state.installPrompt = event;
-    if (nativeInstallButton) nativeInstallButton.hidden = false;
-    if (installButton && !(window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone)) {
-      installButton.hidden = false;
-    }
+    if (installButton) installButton.hidden = false;
   });
 
   window.addEventListener("appinstalled", () => {
     state.installPrompt = null;
-    if (nativeInstallButton) nativeInstallButton.hidden = true;
     if (installButton) installButton.hidden = true;
     addMessage("system", "Future Assistant 已安裝完成，之後可從手機或電腦桌面直接開啟。");
   });
@@ -788,16 +773,17 @@ async function installApp() {
     state.installPrompt = null;
     promptEvent.prompt();
     const choice = await promptEvent.userChoice.catch(() => null);
-    const nativeInstallButton = $("#install-pwa-now");
-    if (nativeInstallButton) nativeInstallButton.hidden = true;
     if (choice?.outcome === "accepted") {
       addMessage("system", "安裝已開始。完成後可像 App 一樣從裝置桌面開啟。");
     }
     return;
   }
 
-  const installDialog = $("#install-dialog");
-  if (installDialog && !installDialog.open) installDialog.showModal();
+  routeTo("guide");
+  addMessage(
+    "system",
+    "此裝置可使用瀏覽器選單的加入主畫面或安裝功能。本站已加入 PWA manifest 與離線快取，手機、電腦與網頁可使用同一個入口。",
+  );
 }
 
 function setupEvents() {
