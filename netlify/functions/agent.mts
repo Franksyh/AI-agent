@@ -3,6 +3,7 @@ import {
   OwnerAuthError,
   authenticateGoogleOwner,
   clearGoogleOwnerCookie,
+  googleOAuthConfig,
   googleOwnerFromRequest,
   ownerLoginStatus,
 } from "../../lib/google-owner-auth.js";
