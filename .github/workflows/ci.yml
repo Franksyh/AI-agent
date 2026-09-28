@@ -1,0 +1,41 @@
+name: Mini Codex CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate web and Windows companion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
+      - name: Compile Python modules
+        run: python -m py_compile mini_codex/access.py mini_codex/bridge.py mini_codex/desktop.py mini_codex/server.py mini_codex/sources.py
+
+      - name: Run Windows companion tests
+        run: python -m unittest discover -s mini_codex/tests -v

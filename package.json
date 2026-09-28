@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check mini-codex-cloud.js && node --check app.js && node --check netlify/functions/agent.mts && node --check \"api/[...route].js\""
+    "check": "node --check mini-codex-cloud.js && node --check mini_codex/web/app.js && node --check app.js && node --check netlify/functions/agent.mts && node --check \"api/[...route].js\""
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9"
