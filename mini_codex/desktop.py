@@ -311,6 +311,13 @@ if __name__ == '__main__':
                 state = json.loads(response.read().decode('utf-8'))
                 if response.status != 200 or not state.get('defaultCwd'):
                     raise RuntimeError('擁有者工作區狀態未能正常啟動')
+        except Exception:
+            error_path = os.environ.get('MINI_CODEX_SMOKE_LOG')
+            if error_path:
+                import traceback
+
+                Path(error_path).write_text(traceback.format_exc(), encoding='utf-8')
+            raise
         finally:
             server.assistant.bridge.close()
             server.shutdown()

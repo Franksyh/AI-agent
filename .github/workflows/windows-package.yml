@@ -75,9 +75,16 @@ jobs:
         run: |
           $env:MINI_CODEX_DATA = Join-Path $PWD "build/smoke-data"
           $env:MINI_CODEX_SMOKE_TEST = "1"
-          & (Join-Path $PWD "dist/MiniCodex/MiniCodex.exe")
-          if ($LASTEXITCODE -ne 0) {
-            throw "Frozen Mini Codex failed its local HTTP startup test (exit $LASTEXITCODE)"
+          $env:MINI_CODEX_SMOKE_LOG = Join-Path $PWD "build/smoke-error.log"
+          $process = Start-Process `
+            -FilePath (Join-Path $PWD "dist/MiniCodex/MiniCodex.exe") `
+            -Wait -PassThru -WindowStyle Hidden
+          if (Test-Path -LiteralPath $env:MINI_CODEX_SMOKE_LOG) {
+            Get-Content -LiteralPath $env:MINI_CODEX_SMOKE_LOG
+            throw "Frozen Mini Codex failed its local HTTP startup test (exit $($process.ExitCode))"
+          }
+          if ($process.ExitCode -ne 0) {
+            throw "Frozen Mini Codex exited with code $($process.ExitCode)"
           }
 
       - name: Upload Windows package
