@@ -225,7 +225,7 @@ export default async function handler(req, res) {
 
 function routeName(req) {
   const queryRoute = req.query?.route;
-  if (Array.isArray(queryRoute)) return queryRoute[0] || "state";
+  if (Array.isArray(queryRoute)) return queryRoute.map(String).filter(Boolean).join("/") || "state";
   if (queryRoute) return queryRoute;
   const url = new URL(req.url || "/api/state", baseUrl(req));
   return url.pathname.replace(/^\/api\/?/, "") || "state";
