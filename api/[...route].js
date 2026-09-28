@@ -1,3 +1,12 @@
+import {
+  OwnerAuthError,
+  authenticateGoogleOwner,
+  clearGoogleOwnerCookie,
+  googleOAuthConfig,
+  googleOwnerFromRequest,
+  ownerLoginStatus,
+} from "../lib/google-owner-auth.js";
+
 const hub = globalThis.__futureAssistantHub || {
   sessions: new Map(),
   codes: new Map(),
@@ -125,7 +134,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET" && route === "state") {
-      return sendJson(res, createState(req));
+      return sendJson(res, await createState(req));
     }
 
     if (req.method === "GET" && route === "sources") {
@@ -140,8 +149,12 @@ export default async function handler(req, res) {
       return sendJson(res, createGoogleOAuthResponse(req));
     }
 
+    if (req.method === "POST" && route === "auth/google") {
+      return await handleGoogleOwnerSession(req, res);
+    }
+
     if (req.method === "GET" && route === "access") {
-      return sendJson(res, createAccessResponse(req));
+      return sendJson(res, await createAccessResponse(req));
     }
 
     if (req.method === "GET" && route === "workflows") {
@@ -237,7 +250,7 @@ function sendJson(res, data, status = 200) {
   res.send(JSON.stringify(data, null, 2));
 }
 
-function createState(req) {
+async function createState(req) {
   return {
     ok: true,
     dynamic: true,
@@ -248,7 +261,7 @@ function createState(req) {
     requestId: requestId(req),
     serverTime: new Date().toISOString(),
     activeSessions: hub.sessions.size,
-    access: accessSummary(),
+    access: await accessSummary(req),
     capabilities: {
       serverPlanning: true,
       dynamicChat: true,
@@ -272,6 +285,7 @@ function createState(req) {
       sourceAutoInstall: false,
       cloudComputerControl: false,
       cloudAccountLinking: googleOAuthConfig().enabled,
+      cloudOwnerLogin: ownerLoginStatus().enabled,
       staticFallback: true,
     },
   };
@@ -291,10 +305,16 @@ function cleanText(value, limit = 20000) {
   return String(value || "").trim().slice(0, limit);
 }
 
-function accessSummary() {
+async function accessSummary(req) {
+  const owner = await googleOwnerFromRequest(req);
   return {
-    publicRole: "雲端訪客",
-    publicDescription: "公開網站目前沒有擁有者登入或管理者帳號；訪客可使用雲端規劃與閱讀，不能操作這台電腦。Windows 本機 Mini 的擁有者權限只在那台電腦上的伴侶程式生效。",
+    publicRole: owner ? "網站擁有者" : "雲端訪客",
+    publicDescription: owner
+      ? `已驗證網站擁有者帳號 ${owner.email}。雲端工作台仍只操作網站資料；Windows 檔案與電腦控制需在本機 Mini 中執行。`
+      : "公開網站目前沒有登入的擁有者帳號；訪客可使用雲端規劃與閱讀。Windows 本機 Mini 的檔案與電腦權限只在擁有者自己的電腦上生效。",
+    authenticated: Boolean(owner),
+    ownerEmail: owner?.email || null,
+    ownerLogin: ownerLoginStatus(),
     owner: {
       label: "owner",
       assignment: "建立遠端 session 的裝置",
@@ -307,7 +327,9 @@ function accessSummary() {
       blocked: ["open_url", "request_approval", "close_session", "computer_control"],
     },
     enforcement: "角色與命令限制會在遠端 API 伺服器端驗證。",
-    authentication: "每個 session 裝置使用獨立 bearer token；此公開服務尚未設定帳號登入。",
+    authentication: owner
+      ? "網站擁有者使用 Google 簽署的 ID token 驗證；安全、HttpOnly Cookie 最長一小時。遠端協作 session 仍使用各自的配對權杖。"
+      : "網站擁有者可用 Google 帳號登入；訪客不取得管理者身分。遠端協作 session 使用各自的配對權杖。",
   };
 }
 
@@ -331,6 +353,7 @@ function createGoogleOAuthResponse(req) {
     generatedAt: new Date().toISOString(),
     requestId: requestId(req),
     googleOAuth: googleOAuthConfig(),
+    ownerLogin: ownerLoginStatus(),
   };
 }
 
@@ -349,33 +372,40 @@ function providerCatalog() {
   });
 }
 
-function googleOAuthConfig() {
-  const clientId = cleanText(process.env.GOOGLE_CLIENT_ID, 240);
-  const validClientId = /^\d+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
-  return validClientId
-    ? {
-      enabled: true,
-      provider: "google",
-      clientId,
-      scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly",
-      flow: "browser_popup_token",
-      persistence: "瀏覽器工作階段；Mini Codex 不保存 Google access token。",
-    }
-    : {
-      enabled: false,
-      reason: "尚未在部署平台設定 GOOGLE_CLIENT_ID。",
-    };
-}
-
-function createAccessResponse(req) {
+async function createAccessResponse(req) {
   return {
     ok: true,
     dynamic: true,
     provider: "vercel",
     generatedAt: new Date().toISOString(),
     requestId: requestId(req),
-    access: accessSummary(),
+    access: await accessSummary(req),
   };
+}
+
+async function handleGoogleOwnerSession(req, res) {
+  const contentType = String(req.headers?.["content-type"] || "").toLowerCase();
+  if (!contentType.includes("application/json")) {
+    return sendJson(res, { ok: false, error: "登入要求必須使用 JSON。" }, 415);
+  }
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (body.action === "logout") {
+    res.setHeader("set-cookie", clearGoogleOwnerCookie());
+    return sendJson(res, { ok: true, authenticated: false });
+  }
+  if (body.action !== "login") {
+    return sendJson(res, { ok: false, error: "未知的登入操作。" }, 400);
+  }
+  try {
+    const session = await authenticateGoogleOwner(body.credential);
+    res.setHeader("set-cookie", session.cookie);
+    return sendJson(res, { ok: true, authenticated: true, email: session.owner.email });
+  } catch (error) {
+    return sendJson(res, {
+      ok: false,
+      error: error instanceof OwnerAuthError ? error.message : "Google 身分驗證失敗，請重新登入。",
+    }, error instanceof OwnerAuthError ? error.status : 401);
+  }
 }
 
 async function createSourcesResponse(req) {

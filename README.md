@@ -55,19 +55,20 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 | --- | --- | --- |
 | Windows 本機 Mini | 擁有者（啟動 Windows 帳號） | 讀取、編輯、核准、來源審查、匯入本機 Codex 對話、用原生選擇器開啟檔案、選擇電腦協助模式 |
 | 公開工作台 | 訪客／一般使用者 | 使用規劃、閱讀公開資料、提出協作訊息 |
+| 公開工作台 | Google 驗證的網站擁有者 | 身分登入可辨識擁有者；本機檔案與電腦權限仍只屬於擁有者自己的 Windows Mini |
 | 公開工作台 | 付費方案介面選擇 | 目前僅展示方案偏好；未啟用付款或額度管理 |
 
 公開協作 session 的建立者是該 session 的 owner；加入者是 member。伺服器端限制 member 只能傳遞文字、連線測試或請求，只有 session owner 能關閉 session。這個協作 owner 不等於 Windows 電腦的擁有者。
 
-Google OAuth、付費訂閱與真正的雲端聊天紀錄需要在部署平台另行設定身分驗證、資料庫、OAuth 用戶端與付款服務；程式不會把「未設定」顯示成已連結或已保護。
+網站擁有者登入需在 Vercel 與 Netlify 分別設定 `GOOGLE_CLIENT_ID` 和 `OWNER_GOOGLE_EMAIL`。未設定前雲端使用者維持一般訪客。付費訂閱與真正的雲端聊天紀錄仍需要部署平台上的付款服務與資料庫；程式不會把「未設定」顯示成已連結或已保護。
 
 ### 連結 Google 帳號
 
 公開版支援選用的 Google OAuth 瀏覽器流程。Google 帳號連結先要求 `openid email profile`；你也可分別授權 Drive 或 Gmail 的唯讀權限。Drive 列出最近修改的 Google 文件／試算表／簡報，Gmail 列出近 30 天郵件；只有你按「加入訊息」並手動傳送後，所選文字才送到 Mini Codex 規劃 API。Google access token 只存在目前頁面記憶體，不會傳到 Mini Codex 伺服器或寫入瀏覽器儲存。Google 可能要求 OAuth 同意畫面設定及應用程式驗證。
 
 1. 在自己的 Google Cloud 專案建立「Web application」OAuth Client，將下列公開來源加入 Authorized JavaScript origins：`https://future-assistant-jade.vercel.app` 與 `https://franksyh-ai-agent.netlify.app`。
-2. 在 Vercel 與／或 Netlify 的環境變數設定 `GOOGLE_CLIENT_ID`。這是可公開的 OAuth client ID，仍不要提交其他 OAuth 或 API secret。
-3. 重新部署後，開啟「AI 與帳號連結」按「連結 Google 帳號」。Drive 與 Gmail 讀取權限會在你按相應按鈕時分別詢問。重新整理後，瀏覽器會忘記 access token，若要重新讀取需再次授權。
+2. 在 Vercel 與 Netlify 分別設定 `GOOGLE_CLIENT_ID` 與 `OWNER_GOOGLE_EMAIL`，後者填入你自己的 Google 電子郵件。前者是可公開的 OAuth client ID；不要提交密碼、Client Secret 或 API 金鑰。
+3. 重新部署後，網站「設定 → 權限」會提供擁有者登入；只有指定 email 的 Google 帳號能登入為網站擁有者。另在「AI 與帳號連結」連結 Google 帳號後，Drive 與 Gmail 唯讀權限會在你按相應按鈕時分別詢問。重新整理後，瀏覽器會忘記讀取資料用的 access token，若要再次讀取需重新授權。
 
 第一次建立 Google OAuth 專案可依照[完整設定步驟](docs/google-oauth-setup-zh-hant.md)操作；提供設定時只需要 Client ID，不要提供 Client Secret。
 
@@ -82,6 +83,7 @@ GET  /api/sources
 GET  /api/providers
 GET  /api/auth/google
 GET  /api/access
+POST /api/auth/google
 POST /api/chat
 POST /api/plan
 POST /api/brief

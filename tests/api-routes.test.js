@@ -54,6 +54,33 @@ test("explicit Vercel Google OAuth status endpoint is reachable without credenti
   });
 });
 
+test("Vercel owner logout clears the secure owner cookie", async () => {
+  const response = createResponse();
+  await googleOAuthStatus({
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: { action: "logout" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(JSON.parse(response.body).authenticated, false);
+  assert.match(response.headers["set-cookie"], /__Secure-mini-codex-owner=; Max-Age=0/);
+  assert.match(response.headers["set-cookie"], /HttpOnly; Secure; SameSite=Strict/);
+});
+
+test("Vercel owner login does not grant a role before deployment configuration exists", async () => {
+  const response = createResponse();
+  await googleOAuthStatus({
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: { action: "login", credential: "header.payload.signature" },
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.match(JSON.parse(response.body).error, /GOOGLE_CLIENT_ID/);
+  assert.equal(response.headers["set-cookie"], undefined);
+});
+
 test("public Cloud access identifies visitors separately from local Mini ownership", async () => {
   const response = createResponse();
   await handler({

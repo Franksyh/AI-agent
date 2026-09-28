@@ -1,4 +1,11 @@
 import { getDeployStore, getStore } from "@netlify/blobs";
+import {
+  OwnerAuthError,
+  authenticateGoogleOwner,
+  clearGoogleOwnerCookie,
+  googleOwnerFromRequest,
+  ownerLoginStatus,
+} from "../../lib/google-owner-auth.js";
 
 const sourceCache = globalThis.__miniCodexSourceCache || {
   expiresAt: 0,
@@ -121,7 +128,7 @@ export default async (req, context) => {
 
   try {
     if (req.method === "GET" && route === "state") {
-      return jsonResponse(createState(context));
+      return jsonResponse(await createState(req, context));
     }
 
     if (req.method === "GET" && route === "sources") {
@@ -136,8 +143,12 @@ export default async (req, context) => {
       return jsonResponse(createGoogleOAuthResponse(context));
     }
 
+    if (req.method === "POST" && route === "auth/google") {
+      return await handleGoogleOwnerSession(req);
+    }
+
     if (req.method === "GET" && route === "access") {
-      return jsonResponse(createAccessResponse(context));
+      return jsonResponse(await createAccessResponse(req, context));
     }
 
     if (req.method === "GET" && route === "workflows") {
@@ -205,7 +216,7 @@ export default async (req, context) => {
 
     return jsonResponse({ ok: false, error: `Unknown API route: ${route}` }, { status: 404 });
   } catch (error) {
-    const status = error instanceof ApiError ? error.status : 500;
+    const status = error instanceof ApiError || error instanceof OwnerAuthError ? error.status : 500;
     return jsonResponse(
       {
         ok: false,
@@ -235,11 +246,12 @@ function jsonResponse(data, init = {}) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
+      ...(init.headers || {}),
     },
   });
 }
 
-function createState(context) {
+async function createState(req, context) {
   return {
     ok: true,
     dynamic: true,
@@ -249,7 +261,7 @@ function createState(context) {
     apiVersion: "2026-09-27.netlify.mini-codex.access.2",
     requestId: getRequestId(context),
     serverTime: new Date().toISOString(),
-    access: accessSummary(),
+    access: await accessSummary(req),
     capabilities: {
       serverPlanning: true,
       dynamicChat: true,
@@ -273,6 +285,7 @@ function createState(context) {
       sourceAutoInstall: false,
       cloudComputerControl: false,
       cloudAccountLinking: googleOAuthConfig().enabled,
+      cloudOwnerLogin: ownerLoginStatus().enabled,
       staticFallback: true,
     },
   };
@@ -286,10 +299,16 @@ function cleanText(value, limit = 20000) {
   return String(value || "").trim().slice(0, limit);
 }
 
-function accessSummary() {
+async function accessSummary(req) {
+  const owner = await googleOwnerFromRequest(req);
   return {
-    publicRole: "雲端訪客",
-    publicDescription: "公開網站目前沒有擁有者登入或管理者帳號；訪客可使用雲端規劃與閱讀，不能操作這台電腦。Windows 本機 Mini 的擁有者權限只在那台電腦上的伴侶程式生效。",
+    publicRole: owner ? "網站擁有者" : "雲端訪客",
+    publicDescription: owner
+      ? `已驗證網站擁有者帳號 ${owner.email}。雲端工作台仍只操作網站資料；Windows 檔案與電腦控制需在本機 Mini 中執行。`
+      : "公開網站目前沒有登入的擁有者帳號；訪客可使用雲端規劃與閱讀。Windows 本機 Mini 的檔案與電腦權限只在擁有者自己的電腦上生效。",
+    authenticated: Boolean(owner),
+    ownerEmail: owner?.email || null,
+    ownerLogin: ownerLoginStatus(),
     owner: {
       label: "owner",
       assignment: "建立遠端 session 的裝置",
@@ -302,7 +321,9 @@ function accessSummary() {
       blocked: ["open_url", "request_approval", "close_session", "computer_control"],
     },
     enforcement: "角色與命令限制會在遠端 API 伺服器端驗證。",
-    authentication: "每個 session 裝置使用獨立 bearer token；此公開服務尚未設定帳號登入。",
+    authentication: owner
+      ? "網站擁有者使用 Google 簽署的 ID token 驗證；安全、HttpOnly Cookie 最長一小時。遠端協作 session 仍使用各自的配對權杖。"
+      : "網站擁有者可用 Google 帳號登入；訪客不取得管理者身分。遠端協作 session 使用各自的配對權杖。",
   };
 }
 
@@ -326,6 +347,7 @@ function createGoogleOAuthResponse(context) {
     generatedAt: new Date().toISOString(),
     requestId: getRequestId(context),
     googleOAuth: googleOAuthConfig(),
+    ownerLogin: ownerLoginStatus(),
   };
 }
 
@@ -344,33 +366,41 @@ function providerCatalog() {
   });
 }
 
-function googleOAuthConfig() {
-  const clientId = cleanText(process.env.GOOGLE_CLIENT_ID, 240);
-  const validClientId = /^\d+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
-  return validClientId
-    ? {
-      enabled: true,
-      provider: "google",
-      clientId,
-      scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly",
-      flow: "browser_popup_token",
-      persistence: "瀏覽器工作階段；Mini Codex 不保存 Google access token。",
-    }
-    : {
-      enabled: false,
-      reason: "尚未在部署平台設定 GOOGLE_CLIENT_ID。",
-    };
-}
-
-function createAccessResponse(context) {
+async function createAccessResponse(req, context) {
   return {
     ok: true,
     dynamic: true,
     provider: "netlify",
     generatedAt: new Date().toISOString(),
     requestId: getRequestId(context),
-    access: accessSummary(),
+    access: await accessSummary(req),
   };
+}
+
+async function handleGoogleOwnerSession(req) {
+  if (!String(req.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
+    return jsonResponse({ ok: false, error: "登入要求必須使用 JSON。" }, { status: 415 });
+  }
+  const body = await readJson(req);
+  if (body.action === "logout") {
+    return jsonResponse({ ok: true, authenticated: false }, { headers: { "set-cookie": clearGoogleOwnerCookie() } });
+  }
+  if (body.action !== "login") {
+    return jsonResponse({ ok: false, error: "未知的登入操作。" }, { status: 400 });
+  }
+  try {
+    const session = await authenticateGoogleOwner(body.credential);
+    return jsonResponse(
+      { ok: true, authenticated: true, email: session.owner.email },
+      { headers: { "set-cookie": session.cookie } },
+    );
+  } catch (error) {
+    const status = error instanceof OwnerAuthError ? error.status : 401;
+    return jsonResponse({
+      ok: false,
+      error: error instanceof OwnerAuthError ? error.message : "Google 身分驗證失敗，請重新登入。",
+    }, { status });
+  }
 }
 
 async function createSourcesResponse(context, url) {

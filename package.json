@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check mini-codex-cloud.js && node --check app.js && node --check netlify/functions/agent.mts && node --check \"api/[...route].js\" && node --test tests/api-routes.test.js"
+    "check": "node --check mini-codex-cloud.js && node --check app.js && node --check netlify/functions/agent.mts && node --check \"api/[...route].js\" && node --test tests/api-routes.test.js tests/google-owner-auth.test.js"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.9"
+    "@netlify/blobs": "^10.7.9",
+    "google-auth-library": "^11.1.0"
   },
   "devDependencies": {
-    "netlify-cli": "^26.1.0"
+    "netlify-cli": "^27.10.0"
   }
 }

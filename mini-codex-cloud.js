@@ -353,6 +353,7 @@ function renderProviders() {
 }
 
 let googleIdentityPromise;
+let googleOwnerClientId;
 
 function loadGoogleIdentity() {
   if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -502,8 +503,96 @@ function renderAccess() {
   const member = document.createElement("div");
   member.className = "access-card";
   member.innerHTML = `<strong>${role}</strong>${safeText(access.publicDescription, "可使用公開雲端功能與閱讀資料；本頁尚未登入管理者帳號，也不能操作你的電腦。Windows 本機 Mini 才會顯示本機擁有者權限。")}`;
-  panel.replaceChildren(owner, member);
-  $("access-badge").textContent = `${role} · 使用與讀取`;
+  const auth = document.createElement("div");
+  auth.className = "access-card owner-auth-card";
+  if (access.authenticated) {
+    const title = document.createElement("strong");
+    title.textContent = "網站擁有者已登入";
+    const identity = document.createElement("p");
+    identity.textContent = safeText(access.ownerEmail, "已驗證 Google 帳號");
+    const logout = document.createElement("button");
+    logout.className = "owner-auth-button";
+    logout.type = "button";
+    logout.textContent = "登出管理者帳號";
+    logout.addEventListener("click", async () => {
+      logout.disabled = true;
+      try {
+        await request("/api/auth/google", { method: "POST", body: JSON.stringify({ action: "logout" }) });
+        await refreshCloudData();
+        showNotice("已登出網站管理者帳號。");
+      } catch (error) {
+        showNotice(error.message || "登出失敗，請重試。");
+      } finally {
+        logout.disabled = false;
+      }
+    });
+    auth.append(title, identity, logout);
+  } else if (access.ownerLogin?.enabled) {
+    const title = document.createElement("strong");
+    title.textContent = "網站管理者登入";
+    const description = document.createElement("p");
+    description.textContent = "使用指定的 Google 擁有者帳號登入。一般 Google 帳號仍維持訪客權限。";
+    const button = document.createElement("div");
+    button.id = "google-owner-button";
+    auth.append(title, description, button);
+    renderGoogleOwnerButton(access.ownerLogin, button);
+  } else {
+    const title = document.createElement("strong");
+    title.textContent = "網站管理者登入尚未設定";
+    const description = document.createElement("p");
+    description.textContent = safeText(access.ownerLogin?.reason, "需先設定 Google OAuth 與擁有者帳號。");
+    const guide = document.createElement("a");
+    guide.href = "https://github.com/Franksyh/AI-agent/blob/main/docs/google-oauth-setup-zh-hant.md";
+    guide.target = "_blank";
+    guide.rel = "noreferrer";
+    guide.textContent = "查看 Google 管理者登入設定步驟 ↗";
+    auth.append(title, description, guide);
+  }
+  panel.replaceChildren(owner, member, auth);
+  $("access-badge").textContent = access.authenticated
+    ? "網站擁有者 · 已驗證"
+    : `${role} · 使用與讀取`;
+}
+
+async function renderGoogleOwnerButton(config, container) {
+  if (!config?.enabled || !config.clientId || !container.isConnected) return;
+  try {
+    await loadGoogleIdentity();
+    if (!container.isConnected) return;
+    if (googleOwnerClientId !== config.clientId) {
+      window.google.accounts.id.initialize({
+        client_id: config.clientId,
+        callback: async (credentialResponse) => {
+          if (!credentialResponse?.credential) {
+            showNotice("Google 沒有提供登入憑證，請重試。");
+            return;
+          }
+          try {
+            await request("/api/auth/google", {
+              method: "POST",
+              body: JSON.stringify({ action: "login", credential: credentialResponse.credential }),
+            });
+            await refreshCloudData();
+            showNotice("Google 擁有者身分已驗證。");
+          } catch (error) {
+            showNotice(error.message || "此帳號沒有網站管理者權限。");
+          }
+        },
+      });
+      googleOwnerClientId = config.clientId;
+    }
+    window.google.accounts.id.renderButton(container, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "signin_with",
+      shape: "rectangular",
+      logo_alignment: "left",
+      locale: "zh-TW",
+    });
+  } catch (error) {
+    if (container.isConnected) container.textContent = error.message || "Google 登入按鈕載入失敗。";
+  }
 }
 
 function render() {
