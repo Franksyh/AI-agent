@@ -16,7 +16,7 @@
 - 長描述：Mini Codex 提供繁體中文的 AI 工作台、開源專案即時中繼資料、語音輸入、對話整理與 Windows 本機 Codex 伴侶程式。安裝版會隨網站更新。本機檔案和 Windows 操作只在擁有者自己的電腦處理，並由擁有者確認。
 - 支援網址：[GitHub 專案](https://github.com/Franksyh/AI-agent)
 - 隱私權網址：[公開隱私權政策](https://future-assistant-jade.vercel.app/privacy.html)
-- 可直接下載 Windows 桌面可攜版：[MiniCodex-Windows.zip](https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip)；解壓後執行 `Start-Mini-Codex.cmd` 或 `MiniCodex.exe`。不需要另外安裝 Python；仍需自行安裝並登入官方 Codex CLI。此 ZIP 未簽署，也不是 Microsoft Store 套件。
+- 可直接下載 Windows 安裝版：[MiniCodex-Setup.exe](https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Setup.exe)；每使用者安裝，不需管理員權限。免安裝備用版：[MiniCodex-Windows.zip](https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip)，解壓後執行 `Start-Mini-Codex.cmd` 或 `MiniCodex.exe`。均不需另外安裝 Python，仍需自行安裝並登入官方 Codex CLI。安裝檔未簽署，也不是 Microsoft Store 套件。
 - 原始碼 ZIP：[GitHub main.zip](https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip)；從原始碼啟動需 Python 3.10+ 與 Codex CLI。
 - 圖示：`assets/mini-robot-512.png`；Store 封裝前要依各平台規格產生截圖和其他尺寸。
 

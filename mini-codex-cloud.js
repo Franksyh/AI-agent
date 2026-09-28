@@ -497,9 +497,12 @@ function renderAccess() {
   owner.className = "access-card";
   owner.innerHTML = "<strong>擁有者（Frank 的本機 Mini）</strong>讀取、編輯、來源審查、工具核准與電腦協助，均需在 Windows 本機工作台中啟用與核准。";
   const download = document.createElement("a");
-  download.href = "https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip";
-  download.textContent = "下載 Windows 本機版（顯示本機擁有者）↓";
-  owner.append(download);
+  download.href = "https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Setup.exe";
+  download.textContent = "下載 Windows 安裝版 ↓";
+  const portable = document.createElement("a");
+  portable.href = "https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip";
+  portable.textContent = "免安裝 ZIP 備用下載 ↗";
+  owner.append(download, portable);
   const member = document.createElement("div");
   member.className = "access-card";
   member.innerHTML = `<strong>${role}</strong>${safeText(access.publicDescription, "可使用公開雲端功能與閱讀資料；本頁尚未登入管理者帳號，也不能操作你的電腦。Windows 本機 Mini 才會顯示本機擁有者權限。")}`;

@@ -15,7 +15,8 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - Netlify：<https://franksyh-ai-agent.netlify.app>
 - GitHub：<https://github.com/Franksyh/AI-agent>
 - Windows 本機 Mini ZIP：<https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip>
-- Windows 桌面可下載版：<https://github.com/Franksyh/AI-agent/releases/latest>（發佈版建置完成後提供）
+- Windows 安裝版：<https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Setup.exe>（每使用者安裝，不需系統管理員權限）
+- Windows 免安裝 ZIP 備用：<https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip>
 
 分階段功能與仍需的帳號設定請見[執行表](docs/roadmap-zh-hant.md)。
 
@@ -29,6 +30,7 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - 語音輸入只會填入文字框，必須由使用者送出；可選擇朗讀回覆。
 - 80%、90%、100%、115%、130% 介面縮放，支援 `Ctrl/Cmd +`、`-`、`0`。
 - PWA 可安裝到手機或電腦。
+- Windows `MiniCodex-Setup.exe` 會安裝到目前使用者的 LocalAppData、建立開始功能表捷徑及解除安裝項目；仍需另行安裝並登入官方 Codex CLI。安裝程式未簽署，沒有 Windows 管理員/UAC 權限；免安裝 ZIP 仍可作為替代下載。
 - 開源來源頁會讀取 GitHub 的公開中繼資料，顯示授權、近期維護、封存狀態與公開社群指標。自動刷新使用五分鐘快取；按「重新檢查網路資料」會立即向 GitHub 讀取一次。
 - 快速分數是透明的公開中繼資料規則式篩選，不代表 AI 已審查程式碼。真正的 AI 程式碼審查仍由本機擁有者使用唯讀 Codex 進行。
 - 公開使用者是「使用與讀取」角色；免費／專業版選擇只是一項本機介面偏好，未連接付款服務，也不會提升權限。
@@ -45,7 +47,7 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 7. 工作模式預設是唯讀或工作區修改。擁有者可選擇全機協助模式，但每次工具與高風險操作仍由 Codex 的核准流程處理。
 8. `選擇並開啟檔案` 只會在桌面 Mini 顯示 Windows 原生檔案選擇器。瀏覽器不會傳送檔案路徑；只有你親自選取的一般檔案才會交給預設應用程式開啟。文字預覽為選用、受限長度的本機顯示，不會自動傳給 AI。
 
-原始碼方式需要 Python 3.10+、Tcl/Tk（桌面 Mini）與已安裝、已登入的官方 Codex CLI。Windows 發佈包內含 Mini 所需的 Python 執行環境，不需另外安裝 Python；仍須自行安裝並登入官方 Codex CLI。Mini 不讀取或儲存 OpenAI 帳號憑證。此下載包為免安裝資料夾，尚未簽署，也不是 Microsoft Store 安裝套件。
+原始碼方式需要 Python 3.10+、Tcl/Tk（桌面 Mini）與已安裝、已登入的官方 Codex CLI。Windows 安裝版與 ZIP 均內含 Mini 所需的 Python 執行環境，不需另外安裝 Python；仍須自行安裝並登入官方 Codex CLI。Mini 不讀取或儲存 OpenAI 帳號憑證。Windows 安裝檔未簽署，也不是 Microsoft Store 套件。
 
 詳細本機使用方式：[mini_codex/README.md](mini_codex/README.md)。
 

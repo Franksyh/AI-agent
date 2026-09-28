@@ -9,7 +9,7 @@
 - GitHub：<https://github.com/Franksyh/AI-agent>
 - Windows 桌面版：<https://github.com/Franksyh/AI-agent/releases/latest>
 - 公開版支援手機／桌面 PWA 安裝、響應式 Codex 風格工作區、對話、語音文字、縮放、隱藏 Mini 與開源來源更新。
-- Windows 桌面版提供免 Python 的可攜 ZIP：<https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip>。仍需使用者自行安裝並登入官方 Codex CLI；本機版透過 Codex App Server 工作，讀取或編輯電腦檔案由擁有者在本機核准。
+- Windows 桌面版提供免管理員權限安裝檔 <https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Setup.exe> 和可攜 ZIP <https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip>。兩者均免 Python，仍需使用者自行安裝並登入官方 Codex CLI；本機版透過 Codex App Server 工作，讀取或編輯電腦檔案由擁有者在本機核准。
 - 已驗證 Vercel 與 Netlify 公開頁、隱私頁、API、安裝圖示可回應，且現有 15 項 Python 測試通過。
 
 ## 第 2 階段：帳號與 AI 服務串接 — 部分完成
@@ -27,10 +27,10 @@
 - 需先選定會員權益、價格、退款／服務條款和收款商；若使用綠界 ECPay，還需商家帳號及測試環境資料。
 - 實作需包含伺服器端建立訂單、驗證付款回呼、持久化會員狀態及權限檢查；不能只依瀏覽器回報「已付款」。
 
-## 第 4 階段：手機與桌面安裝包 — PWA 與 Windows 可攜版完成，Windows Setup 建置中
+## 第 4 階段：手機與桌面安裝包 — PWA、Windows 安裝程式與 ZIP 完成，商店套件未完成
 
 - 現在可直接安裝 PWA；Windows 本機伴侶程式可從 GitHub Release 下載免 Python ZIP，解壓後執行 `Start-Mini-Codex.cmd` 或 `MiniCodex.exe`。
-- per-user Windows Setup 安裝程式、開始功能表捷徑、解除安裝項目和 Windows CI 冒煙測試已完成；CI 已在 Windows runner 實際安裝、啟動、解除安裝成功。Setup 尚未放入公開 Release；下一步發布 `desktop-v0.1.2`。
+- per-user Windows Setup 安裝程式、開始功能表捷徑與解除安裝項目已發布為 `desktop-v0.1.2`。GitHub Actions 在 Windows runner 實際安裝、啟動與解除安裝通過。
 - Android AAB、Windows MSIX 與原生 iOS 專案尚未生成／送審。需設定應用程式識別碼、簽章和各商店開發者帳號；iOS 原生簽署建置需 macOS／Xcode。
 
 ## 第 5 階段：商店與正式營運 — 尚未開始
