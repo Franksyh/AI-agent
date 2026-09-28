@@ -16,6 +16,8 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - GitHub：<https://github.com/Franksyh/AI-agent>
 - Windows 本機 Mini ZIP：<https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip>
 
+分階段功能與仍需的帳號設定請見[執行表](docs/roadmap-zh-hant.md)。
+
 舊的 `/mini-codex-cloud.html` 會自動導向新版首頁。
 
 ## 功能
