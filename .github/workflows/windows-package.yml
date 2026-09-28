@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   package:
-    name: Build portable Windows desktop package
+    name: Build Windows desktop packages
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -70,6 +70,48 @@ jobs:
             throw "Windows ZIP was not created"
           }
 
+      - name: Install NSIS packager
+        shell: pwsh
+        run: choco install nsis.install --version=3.12.0 --no-progress --yes
+
+      - name: Build per-user Windows installer
+        shell: pwsh
+        run: |
+          $compiler = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $compiler) {
+            $candidate = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "NSIS\makensis.exe"
+            if (Test-Path -LiteralPath $candidate) { $compiler = @{ Source = $candidate } }
+          }
+          if (-not $compiler) { throw "NSIS compiler was not installed" }
+          $version = if ($env:GITHUB_REF_NAME -match '^desktop-v(\d+\.\d+\.\d+)$') { $Matches[1] } else { "0.1.2" }
+          & $compiler.Source "/NOCD" "/INPUTCHARSET" "UTF8" "/DAPP_VERSION=$version" "installer\MiniCodex.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS failed to build the installer (exit $LASTEXITCODE)" }
+          if (-not (Test-Path -LiteralPath "dist\MiniCodex-Setup.exe" -PathType Leaf)) { throw "Windows installer was not created" }
+
+      - name: Smoke test per-user installer and uninstaller
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "MiniCodexInstallerSmoke"
+          $setup = Join-Path $PWD "dist\MiniCodex-Setup.exe"
+          $install = Start-Process -FilePath $setup -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru -WindowStyle Hidden
+          if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)" }
+          $executable = Join-Path $installDir "MiniCodex.exe"
+          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Installer did not install MiniCodex.exe" }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir "_internal\web\index.html") -PathType Leaf)) { throw "Installer is missing the local web interface" }
+          $env:MINI_CODEX_DATA = Join-Path $env:RUNNER_TEMP "MiniCodex Installer Smoke Data"
+          $env:MINI_CODEX_SMOKE_TEST = "1"
+          $env:MINI_CODEX_SMOKE_LOG = Join-Path $installDir "smoke-error.log"
+          $process = Start-Process -FilePath $executable -Wait -PassThru -WindowStyle Hidden
+          if (Test-Path -LiteralPath $env:MINI_CODEX_SMOKE_LOG) {
+            Get-Content -LiteralPath $env:MINI_CODEX_SMOKE_LOG
+            throw "Installed Mini Codex failed its local HTTP startup test (exit $($process.ExitCode))"
+          }
+          if ($process.ExitCode -ne 0) { throw "Installed Mini Codex exited with code $($process.ExitCode)" }
+          $uninstaller = Join-Path $installDir "Uninstall.exe"
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -PassThru -WindowStyle Hidden
+          if ($remove.ExitCode -ne 0) { throw "Uninstaller exited with code $($remove.ExitCode)" }
+          if (Test-Path -LiteralPath $installDir) { throw "Uninstaller left installation files behind" }
+
       - name: Smoke test frozen Windows executable
         shell: pwsh
         run: |
@@ -91,7 +133,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: MiniCodex-Windows
-          path: dist/MiniCodex-Windows.zip
+          path: |
+            dist/MiniCodex-Windows.zip
+            dist/MiniCodex-Setup.exe
           if-no-files-found: error
           retention-days: 30
 
@@ -116,7 +160,8 @@ jobs:
         run: |
           gh release create $env:GITHUB_REF_NAME `
             "release/MiniCodex-Windows.zip" `
+            "release/MiniCodex-Setup.exe" `
             --repo Franksyh/AI-agent `
             --verify-tag `
             --title "Mini Codex Windows $env:GITHUB_REF_NAME" `
-            --notes "Portable Windows desktop package. Extract the ZIP and run Start-Mini-Codex.cmd. Python is bundled. Install and sign in to the official Codex CLI separately; it is not included. This package is unsigned and is not a Microsoft Store installer."
+            --notes "Windows per-user installer: run MiniCodex-Setup.exe to install under the current Windows user, create shortcuts, and register an uninstaller. The portable ZIP remains available as an alternative. Python is bundled; install and sign in to the official Codex CLI separately. The installer is unsigned and is not a Microsoft Store package."
