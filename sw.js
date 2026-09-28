@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "mini-codex-cloud-shell-v7";
+const CACHE_NAME = "mini-codex-cloud-shell-v8";
 const APP_SHELL = [
   "/",
   "/index.html",

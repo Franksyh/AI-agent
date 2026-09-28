@@ -490,14 +490,18 @@ async function loadGoogleContent(oauth, kind) {
 
 function renderAccess() {
   const access = state.access || {};
-  const role = safeText(access.publicRole, "一般使用者");
+  const role = safeText(access.publicRole, "雲端訪客");
   const panel = $("access-panel");
   const owner = document.createElement("div");
   owner.className = "access-card";
   owner.innerHTML = "<strong>擁有者（Frank 的本機 Mini）</strong>讀取、編輯、來源審查、工具核准與電腦協助，均需在 Windows 本機工作台中啟用與核准。";
+  const download = document.createElement("a");
+  download.href = "https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip";
+  download.textContent = "下載 Windows 本機版（顯示本機擁有者）↓";
+  owner.append(download);
   const member = document.createElement("div");
   member.className = "access-card";
-  member.innerHTML = `<strong>${role}</strong>${safeText(access.publicDescription, "可使用規劃、閱讀公開來源與提出協作請求，不能取得本機檔案或電腦控制。")}`;
+  member.innerHTML = `<strong>${role}</strong>${safeText(access.publicDescription, "可使用公開雲端功能與閱讀資料；本頁尚未登入管理者帳號，也不能操作你的電腦。Windows 本機 Mini 才會顯示本機擁有者權限。")}`;
   panel.replaceChildren(owner, member);
   $("access-badge").textContent = `${role} · 使用與讀取`;
 }

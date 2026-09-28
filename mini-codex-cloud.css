@@ -47,6 +47,7 @@ a { color: inherit; text-decoration: none; }
 .sidebar-footer { padding: 18px 10px 0; color: var(--muted); }
 .sidebar-footer p { margin: 10px 0; line-height: 1.7; font-size: 11px; }
 .sidebar-footer a { color: #6f7a89; font-size: 10px; }
+.sidebar-footer .download-link { display: inline-block; margin-bottom: 8px; color: var(--accent-ink); font-weight: 650; }
 .local-status { display: flex; align-items: center; gap: 7px; color: #70808f; font-size: 11px; }
 .local-status i, .eyebrow i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 3px #62b59618; }
 .workspace { display: flex; min-width: 0; min-height: 0; flex-direction: column; background: #fff; }
@@ -128,6 +129,7 @@ a { color: inherit; text-decoration: none; }
 .access-panel { display: grid; gap: 9px; margin-bottom: 13px; }
 .access-card { padding: 10px; border-radius: 8px; background: #f2f5f9; color: #738092; font-size: 10px; line-height: 1.6; }
 .access-card strong { display: block; margin-bottom: 3px; color: #4c5768; font-size: 11px; }
+.access-card a { display: inline-block; margin-top: 8px; color: var(--accent-ink); font-weight: 650; }
 .mini-float { position: fixed; right: 25px; bottom: 20px; display: flex; align-items: center; gap: 8px; padding: 8px 9px 8px 7px; border: 1px solid #e0e4ed; border-radius: 16px; background: #fff; box-shadow: 0 14px 35px #28385022; z-index: 9; }
 .mini-float img { width: 47px; height: 47px; }
 .mini-float b, .mini-float span { display: block; }

@@ -53,3 +53,18 @@ test("explicit Vercel Google OAuth status endpoint is reachable without credenti
     reason: "尚未在部署平台設定 GOOGLE_CLIENT_ID。",
   });
 });
+
+test("public Cloud access identifies visitors separately from local Mini ownership", async () => {
+  const response = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/state",
+    headers: { host: "future-assistant-jade.vercel.app" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  const body = JSON.parse(response.body);
+  assert.equal(body.access.publicRole, "雲端訪客");
+  assert.match(body.access.publicDescription, /Windows 本機 Mini/);
+  assert.equal(body.access.owner.label, "owner");
+});

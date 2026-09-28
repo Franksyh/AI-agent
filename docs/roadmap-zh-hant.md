@@ -15,6 +15,7 @@
 ## 第 2 階段：帳號與 AI 服務串接 — 部分完成
 
 - Google OAuth 與 Drive／Gmail 唯讀匯入流程已寫好；正式部署尚未設定 `GOOGLE_CLIENT_ID`，因此目前顯示未設定。完成 Google Cloud Web OAuth 用戶端與同意畫面後，才可啟用。
+- 公開雲端版沒有已登入的產品擁有者帳號；雲端標示「訪客」代表公開網站權限，不會改變 Windows 本機 Mini 的擁有者角色。正式管理者登入仍待 OAuth Client ID、擁有者帳號識別與伺服器端授權驗證。
 - 開源來源目前更新 GitHub 公開中繼資料；分數不是 AI 程式碼審查。Windows 本機版可透過使用者已登入的 Codex 做唯讀程式審查。
 - Gemini、Perplexity、ChatGPT API、Siri／Apple Intelligence 目前不是可互換的完整雲端代理。下一步要逐一使用官方 API 或官方 CLI、完成憑證設定與能力測試，再做模型選擇與回退。
 - 一般使用者的公開聊天目前以規則式工作規劃為主，尚未連上雲端大型語言模型。

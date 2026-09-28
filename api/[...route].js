@@ -293,6 +293,8 @@ function cleanText(value, limit = 20000) {
 
 function accessSummary() {
   return {
+    publicRole: "雲端訪客",
+    publicDescription: "公開網站目前沒有擁有者登入或管理者帳號；訪客可使用雲端規劃與閱讀，不能操作這台電腦。Windows 本機 Mini 的擁有者權限只在那台電腦上的伴侶程式生效。",
     owner: {
       label: "owner",
       assignment: "建立遠端 session 的裝置",
