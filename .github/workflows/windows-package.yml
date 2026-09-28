@@ -98,6 +98,7 @@ jobs:
         run: |
           gh release create $env:GITHUB_REF_NAME `
             "release/MiniCodex-Windows.zip" `
+            --repo Franksyh/AI-agent `
             --verify-tag `
             --title "Mini Codex Windows $env:GITHUB_REF_NAME" `
             --notes "Portable Windows desktop package. Extract the ZIP and run Start-Mini-Codex.cmd. Python is bundled. Install and sign in to the official Codex CLI separately; it is not included. This package is unsigned and is not a Microsoft Store installer."
