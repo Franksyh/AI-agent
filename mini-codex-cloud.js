@@ -668,7 +668,9 @@ function renderAccess() {
   panel.replaceChildren(owner, member, auth);
   $("access-badge").textContent = access.authenticated
     ? "網站擁有者 · 已驗證"
-    : `${role} · 使用與讀取`;
+    : access.ownerLogin?.enabled
+      ? `${role} · 使用與讀取`
+      : "管理者登入未設定";
 }
 
 async function renderGoogleOwnerButton(config, container) {
