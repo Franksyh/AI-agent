@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8fafc">
+  <title>隱私權政策 · Mini Codex</title>
+  <link rel="stylesheet" href="/mini-codex-cloud.css">
+</head>
+<body>
+  <main style="max-width:760px;margin:6vh auto;padding:28px;background:#fff;border-radius:18px;line-height:1.8">
+    <a href="/">← 回到 Mini Codex</a>
+    <h1>Mini Codex 隱私權政策</h1>
+    <p>生效日期：2026 年 9 月 28 日</p>
+    <h2>公開網頁與手機 PWA</h2>
+    <p>公開工作台把對話內容送到部署平台的 Mini Codex API，用來回傳規劃與任務整理結果。網站不會把這些內容存入 Mini Codex 的伺服器資料庫。瀏覽器對話、方案偏好及介面設定保存在目前瀏覽器的本機儲存空間。</p>
+    <p>開源來源頁讀取列出的公開 GitHub 儲存庫中繼資料。網站不會下載、安裝或執行這些來源的程式碼。</p>
+    <h2>Google 帳號</h2>
+    <p>只有在營運者設定 Google OAuth Client ID 後，網站才會顯示 Google 連結功能。帳號連結先讀取基本帳號識別資料。使用者可另外選擇授權唯讀 Google Drive 或 Gmail 權限，瀏覽器只列出可讀的 Google 文件或近 30 天郵件；Google access token 只保存在目前頁面記憶體，且不會傳給 Mini Codex 伺服器。匯入的文件或郵件內容只有在使用者按下傳送後，才會隨訊息傳給 Mini Codex API 以產生規劃回覆。</p>
+    <h2>Windows 本機 Mini</h2>
+    <p>本機工作台的聊天紀錄保存在使用者電腦的 MiniCodex 資料夾。你選取的附件會交給已安裝並登入的 Codex 程式處理，實際模型服務依 OpenAI Codex 帳號和其隱私設定提供。選取檔案的文字預覽不會自動交給 AI。</p>
+    <p>桌面 Mini 只監聽本機迴圈位址，公開網站無法存取電腦檔案。使用者選擇的檔案或專案內容可能依你的明確提示送至 Codex 模型服務。</p>
+    <h2>第三方服務</h2>
+    <p>使用者開啟 GitHub、Google、Vercel、Netlify 或其他第三方連結時，該服務依其自己的隱私政策處理資訊。Mini Codex 不持有這些服務的使用者密碼。</p>
+    <h2>聯絡方式</h2>
+    <p>本專案由 <a href="https://github.com/Franksyh/AI-agent">GitHub 專案頁</a>維護。你可在該處提出隱私與資料處理問題。</p>
+  </main>
+</body>
+</html>

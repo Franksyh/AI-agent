@@ -15,6 +15,10 @@ const state = {
   working: false,
   settings: { scale: 1, speech: false, plan: "free", miniHidden: false },
 };
+let installPrompt = null;
+let googleAccessToken = null;
+let googleAccessExpiresAt = 0;
+let googleContentItems = [];
 
 function id() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -271,23 +275,72 @@ function renderProviders() {
       const detail = document.createElement("small");
       detail.className = "provider-account";
       detail.textContent = google?.email
-        ? `這個瀏覽器已確認：${google.name ? `${google.name} · ` : ""}${google.email}`
-        : "連結只確認 Google 帳號身分；Mini Codex 不保存 Google access token。";
+        ? `這個瀏覽器已連結：${google.name ? `${google.name} · ` : ""}${google.email}`
+        : "可連結 Google，並在你同意後唯讀瀏覽 Drive 文件或 Gmail 郵件。";
       const action = document.createElement("button");
       action.type = "button";
       action.className = "provider-action";
       action.textContent = google?.email ? "中斷 Google 連結" : "連結 Google 帳號";
       action.addEventListener("click", () => {
         if (state.settings.googleAccount?.email) {
+          if (googleAccessToken && window.google?.accounts?.oauth2) {
+            window.google.accounts.oauth2.revoke(googleAccessToken, () => {});
+          }
+          googleAccessToken = null;
+          googleAccessExpiresAt = 0;
+          googleContentItems = [];
           delete state.settings.googleAccount;
           persist();
-          renderProviders();
-          showNotice("已移除此瀏覽器顯示的 Google 帳號資訊。Google 的授權工作階段由瀏覽器管理。");
+          render();
+          showNotice("已中斷 Google 連結並清除目前頁面的存取權杖。");
           return;
         }
         connectGoogle(provider.oauth);
       });
       card.append(detail, action);
+      if (google?.email) {
+        const tools = document.createElement("div");
+        tools.className = "provider-tools";
+        for (const [kind, label] of [["drive", "讀取 Drive 文件"], ["gmail", "讀取 Gmail 郵件"]]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "provider-action";
+          button.textContent = label;
+          button.addEventListener("click", () => loadGoogleContent(provider.oauth, kind));
+          tools.append(button);
+        }
+        card.append(tools);
+        if (googleContentItems.length) {
+          const items = document.createElement("div");
+          items.className = "provider-content-list";
+          for (const item of googleContentItems) {
+            const row = document.createElement("div");
+            row.className = "provider-content-item";
+            const title = document.createElement("span");
+            title.textContent = `${item.source} · ${item.title}`;
+            const add = document.createElement("button");
+            add.type = "button";
+            add.textContent = "加入訊息";
+            add.addEventListener("click", () => {
+              const prompt = $("prompt");
+              const current = prompt.value.trim();
+              const header = `<${item.source} 標題=\"${item.title}\">\n`;
+              const footer = `\n</${item.source}>`;
+              const available = Math.max(0, 11800 - current.length - header.length - footer.length);
+              if (available < 100) {
+                showNotice("訊息草稿已接近長度上限，請先傳送或清除部分內容，再加入 Google 內容。");
+                return;
+              }
+              prompt.value = `${current}${current ? "\n\n" : ""}${header}${item.content.slice(0, Math.min(10000, available))}${footer}`;
+              prompt.focus();
+              showNotice("已放入訊息草稿；檢查內容後再按傳送。只有按傳送後才會交給 Mini Codex。");
+            });
+            row.append(title, add);
+            items.append(row);
+          }
+          card.append(items);
+        }
+      }
     }
     return card;
   }));
@@ -316,45 +369,122 @@ function loadGoogleIdentity() {
   return googleIdentityPromise;
 }
 
+async function requestGoogleToken(oauth, scope) {
+  await loadGoogleIdentity();
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: oauth.clientId,
+      scope,
+      include_granted_scopes: true,
+      callback: (tokenResponse) => {
+        if (tokenResponse?.error || !tokenResponse?.access_token) {
+          reject(new Error(tokenResponse?.error_description || "Google 帳號授權沒有完成。"));
+          return;
+        }
+        googleAccessToken = tokenResponse.access_token;
+        googleAccessExpiresAt = Date.now() + Math.max(60, Number(tokenResponse.expires_in || 3600) - 60) * 1000;
+        resolve(tokenResponse);
+      },
+    });
+    tokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
+  });
+}
+
 async function connectGoogle(oauth) {
   if (!oauth?.enabled || !oauth.clientId) {
     showNotice("Google OAuth 尚未在這個部署平台設定。請先設定 GOOGLE_CLIENT_ID。 ");
     return;
   }
   try {
-    await loadGoogleIdentity();
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: oauth.clientId,
-      scope: oauth.scope || "openid email profile",
-      include_granted_scopes: true,
-      callback: async (tokenResponse) => {
-        if (tokenResponse?.error || !tokenResponse?.access_token) {
-          showNotice(tokenResponse?.error_description || "Google 帳號連結沒有完成。");
-          return;
-        }
-        try {
-          const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-            headers: { authorization: `Bearer ${tokenResponse.access_token}` },
-          });
-          if (!response.ok) throw new Error("Google 未回傳帳號資訊。");
-          const profile = await response.json();
-          if (!profile?.email) throw new Error("Google 帳號資訊缺少電子郵件。 ");
-          state.settings.googleAccount = {
-            email: safeText(profile.email),
-            name: safeText(profile.name),
-            connectedAt: new Date().toISOString(),
-          };
-          persist();
-          renderProviders();
-          showNotice("Google 帳號已在此瀏覽器確認。存取權杖只在目前瀏覽器工作階段使用，未交給 Mini Codex。 ");
-        } catch (error) {
-          showNotice(error.message || "Google 帳號資訊讀取失敗。 ");
-        }
-      },
+    await requestGoogleToken(oauth, "openid email profile");
+    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { authorization: `Bearer ${googleAccessToken}` },
     });
-    tokenClient.requestAccessToken({ prompt: "consent" });
+    if (!response.ok) throw new Error("Google 未回傳帳號資訊。");
+    const profile = await response.json();
+    if (!profile?.email) throw new Error("Google 帳號資訊缺少電子郵件。 ");
+    state.settings.googleAccount = {
+      email: safeText(profile.email),
+      name: safeText(profile.name),
+      connectedAt: new Date().toISOString(),
+    };
+    persist();
+    render();
+    showNotice("Google 帳號已連結。唯讀資料只在你選取並按「加入訊息」後才會放入草稿。 ");
   } catch (error) {
     showNotice(error.message || "Google OAuth 尚未完成。 ");
+  }
+}
+
+function decodeBase64Url(value) {
+  const binary = atob(String(value || "").replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+function googleApi(path) {
+  if (!googleAccessToken || Date.now() >= googleAccessExpiresAt) throw new Error("Google 授權已到期，請重新連結帳號。");
+  return fetch(path, { headers: { authorization: `Bearer ${googleAccessToken}` } }).then(async (response) => {
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error?.message || "Google 資料讀取失敗。");
+    return payload;
+  });
+}
+
+async function readGmailMessage(idValue) {
+  const message = await googleApi(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(idValue)}?format=full`);
+  const headers = message.payload?.headers || [];
+  const subject = headers.find((header) => header.name?.toLowerCase() === "subject")?.value || "Gmail 郵件";
+  const parts = [];
+  const walk = (part) => {
+    if (part?.mimeType === "text/plain" && part.body?.data) parts.push(decodeBase64Url(part.body.data));
+    for (const child of part?.parts || []) walk(child);
+  };
+  walk(message.payload);
+  const text = parts.join("\n").trim() || message.snippet || "（沒有可讀取的純文字內容）";
+  return { id: idValue, source: "Gmail", title: subject.slice(0, 180), content: text.slice(0, 24000) };
+}
+
+async function loadGoogleContent(oauth, kind) {
+  if (!oauth?.enabled || !oauth.clientId) {
+    showNotice("此部署尚未設定 Google OAuth Client ID。");
+    return;
+  }
+  try {
+    const scope = kind === "drive"
+      ? "https://www.googleapis.com/auth/drive.readonly"
+      : "https://www.googleapis.com/auth/gmail.readonly";
+    await requestGoogleToken(oauth, scope);
+    const items = [];
+    if (kind === "drive") {
+      const query = new URLSearchParams({
+        q: "trashed = false and mimeType != 'application/vnd.google-apps.folder'",
+        orderBy: "modifiedTime desc",
+        pageSize: "15",
+        fields: "files(id,name,mimeType,modifiedTime)",
+      });
+      const result = await googleApi(`https://www.googleapis.com/drive/v3/files?${query}`);
+      for (const file of result.files || []) {
+        const mime = file.mimeType || "";
+        const exportType = mime === "application/vnd.google-apps.document" || mime === "application/vnd.google-apps.presentation"
+          ? "text/plain"
+          : mime === "application/vnd.google-apps.spreadsheet" ? "text/csv" : "";
+        if (!exportType) continue;
+        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}/export?mimeType=${encodeURIComponent(exportType)}`, {
+          headers: { authorization: `Bearer ${googleAccessToken}` },
+        });
+        if (!response.ok) continue;
+        items.push({ id: file.id, source: "Google Drive", title: file.name || "未命名文件", content: (await response.text()).slice(0, 24000) });
+      }
+    } else {
+      const result = await googleApi("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=newer_than%3A30d");
+      items.push(...await Promise.all((result.messages || []).slice(0, 10).map((message) => readGmailMessage(message.id))));
+    }
+    googleContentItems = items;
+    renderProviders();
+    showNotice(items.length ? `已列出 ${items.length} 個唯讀項目；只有按「加入訊息」才會放入草稿。` : "Google 沒有找到可匯入的文字文件或郵件。");
+  } catch (error) {
+    showNotice(error.message || "讀取 Google 內容失敗。");
   }
 }
 
@@ -537,6 +667,21 @@ function wire() {
     }
   });
   $("hide-mini").addEventListener("click", () => { state.settings.miniHidden = true; persist(); render(); });
+  $("install-app").addEventListener("click", async () => {
+    if (!installPrompt) { $("install-dialog").showModal(); return; }
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    $("install-app").textContent = "安裝說明";
+  });
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installPrompt = event;
+  });
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    $("install-app").textContent = "已安裝";
+  });
   $("open-local-help").addEventListener("click", () => {
     showNotice("請在 Windows 執行 Start-Mini-Codex.cmd，登入 Codex 後由你核准讀取、編輯或電腦協助。公開網站無法取得這些權限。");
   });

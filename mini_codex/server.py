@@ -11,6 +11,7 @@ import secrets
 import shutil
 import threading
 import time
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -29,10 +30,14 @@ class Assistant:
         self.lock = threading.RLock()
         self.file = Path(data_dir) / 'chats.json'
         self.data_dir = Path(data_dir)
+        self.projects_file = Path(data_dir) / 'projects.json'
+        self.project_settings_file = Path(data_dir) / 'project-settings.json'
         self.access = AccessPolicy(self.data_dir)
         self.sources = SourceManager(self.data_dir)
         self.chats = []
         self.current = None
+        self.projects = self._load_projects()
+        self.current_project_id = self._load_project_selection()
         self.loaded = set()
         self.busy = False
         self.turn_id = None
@@ -98,6 +103,76 @@ class Assistant:
             self.file.write_text(temporary.read_text(encoding='utf-8'), encoding='utf-8')
             temporary.unlink(missing_ok=True)
 
+    def _load_projects(self):
+        try:
+            rows = json.loads(self.projects_file.read_text(encoding='utf-8'))
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, dict) and
+                        isinstance(row.get('id'), str) and isinstance(row.get('path'), str)]
+        except (OSError, ValueError, TypeError):
+            pass
+        return []
+
+    def _load_project_selection(self):
+        try:
+            value = json.loads(self.project_settings_file.read_text(encoding='utf-8'))
+            selected = value.get('currentProjectId') if isinstance(value, dict) else None
+            if selected and any(project['id'] == selected for project in self.projects):
+                return selected
+        except (OSError, ValueError, TypeError):
+            pass
+        return None
+
+    def _save_projects(self):
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        temporary = self.projects_file.with_suffix('.tmp')
+        temporary.write_text(json.dumps(self.projects, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary.replace(self.projects_file)
+        self.project_settings_file.write_text(json.dumps(
+            {'currentProjectId': self.current_project_id}, ensure_ascii=False, indent=2), encoding='utf-8')
+
+    def _project(self, project_id):
+        return next((row for row in self.projects if row['id'] == project_id), None)
+
+    def create_project(self, name, parent_path, goal=''):
+        name = str(name or '').strip()
+        if not name or len(name) > 64 or name in {'.', '..'} or not re.fullmatch(r'[\w .()\-]+', name, re.UNICODE):
+            raise ValueError('專案名稱只能包含文字、數字、空格、句點、括號與連字號。')
+        if name.endswith(('.', ' ')) or re.fullmatch(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?', name, re.I):
+            raise ValueError('這個名稱不能用作 Windows 資料夾名稱。')
+        parent = Path(str(parent_path or '')).expanduser().resolve(strict=True)
+        if not parent.is_dir():
+            raise ValueError('請選擇已存在的資料夾作為專案位置。')
+        target = (parent / name).resolve()
+        if target.parent != parent:
+            raise ValueError('專案只能建立在選定資料夾下一層。')
+        target.mkdir(exist_ok=False)
+        project = {
+            'id': secrets.token_urlsafe(12), 'name': name, 'path': str(target),
+            'goal': str(goal or '').strip()[:2000], 'createdAt': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+        }
+        self.projects.insert(0, project)
+        self.current_project_id = project['id']
+        self._save_projects()
+        with self.lock:
+            self.current = None
+            self.revision += 1
+        return {'project': copy.deepcopy(project)}
+
+    def select_project(self, project_id):
+        project = self._project(project_id)
+        if not project:
+            raise ValueError('找不到這個專案。')
+        path = Path(project['path']).resolve(strict=True)
+        if not path.is_dir():
+            raise ValueError('專案資料夾已不存在。')
+        self.current_project_id = project_id
+        self._save_projects()
+        with self.lock:
+            self.current = None
+            self.revision += 1
+        return {'project': copy.deepcopy(project)}
+
     def chat(self):
         return next((c for c in self.chats if c['id'] == self.current), None)
 
@@ -133,7 +208,9 @@ class Assistant:
                 'chat': self.chat() if is_owner else None,
                 'approvals': list(self.approvals.values()) if is_owner else [],
                 'revision': self.revision,
-                'defaultCwd': str(ROOT.parent) if is_owner else '',
+                'defaultCwd': ((self._project(self.current_project_id) or {}).get('path') or str(ROOT.parent)) if is_owner else '',
+                'projects': copy.deepcopy(self.projects) if is_owner else [],
+                'currentProjectId': self.current_project_id if is_owner else None,
                 'sources': self.sources.list() if is_owner else [],
                 'providers': self.providers(),
                 'access': self.access.public(role),
@@ -366,9 +443,35 @@ class Assistant:
             with self.lock:
                 self.revision += 1
             return result
+        if action == 'projects':
+            sub_action = data.get('subAction', 'list')
+            if sub_action == 'create':
+                return self.create_project(data.get('name'), data.get('parent'), data.get('goal'))
+            if sub_action == 'select':
+                return self.select_project(str(data.get('id', '')))
+            if sub_action == 'goal':
+                project = self._project(str(data.get('id', '')))
+                if not project:
+                    raise ValueError('請先選擇一個專案。')
+                project['goal'] = str(data.get('goal') or '').strip()[:2000]
+                self._save_projects()
+                with self.lock:
+                    self.revision += 1
+                return {'project': copy.deepcopy(project)}
+            if sub_action == 'list':
+                return {'projects': copy.deepcopy(self.projects), 'currentProjectId': self.current_project_id}
+            raise ValueError('未知的專案操作')
         if action == 'login':
             result = self.bridge.request('account/login/start', {'type': 'chatgpt'})
             return {'url': result.get('authUrl')}
+        if action == 'logout':
+            if self.busy:
+                raise ValueError('請先停止目前任務，再登出 Codex。')
+            self.bridge.request('account/logout', {})
+            with self.lock:
+                self.account = False
+                self.revision += 1
+            return {'loggedOut': True}
         if action == 'approve':
             with self.lock:
                 key = str(data['id'])
@@ -398,6 +501,12 @@ class Assistant:
                 if target and not any(c['id'] == target for c in self.chats):
                     raise ValueError('找不到對話')
                 self.current = target
+                if action == 'select' and target:
+                    selected_chat = next(c for c in self.chats if c['id'] == target)
+                    self.current_project_id = selected_chat.get('projectId')
+                    self._save_projects()
+                elif action == 'new' and data.get('projectId'):
+                    self.select_project(str(data.get('projectId')))
                 self.error = ''
                 self.revision += 1
             return {}
@@ -416,8 +525,9 @@ class Assistant:
             if not Path(cwd).is_dir():
                 raise ValueError('專案資料夾不存在')
             mode = chat['mode'] if chat else data.get('mode', 'read-only')
-            if not self.access.allow_mode(role, mode):
-                if mode == 'danger-full-access':
+            sandbox = 'read-only' if mode == 'plan' else mode
+            if not self.access.allow_mode(role, sandbox):
+                if sandbox == 'danger-full-access':
                     raise PermissionError('完整電腦存取只限擁有者，且不會自動啟用')
                 raise ValueError('這個工作階段不允許該工作模式')
             self.busy = True
@@ -425,26 +535,67 @@ class Assistant:
             self.revision += 1
         try:
             if chat is None:
-                options = {'cwd': cwd, 'sandbox': mode, 'approvalPolicy': 'on-request',
-                    'developerInstructions': '你是 Mini Codex 的 AI 助手。使用繁體中文。清楚呈現工作進度與結果。'}
+                project = self._project(self.current_project_id)
+                goal = str(data.get('goal') or (project.get('goal', '') if project else '')).strip()[:2000]
+                instructions = '你是 Mini Codex 的 AI 助手。使用繁體中文。清楚呈現工作進度與結果。'
+                if goal:
+                    instructions += f'\n使用者為目前專案設定的目標：{goal}'
+                if mode == 'plan':
+                    instructions += '\n目前是規劃模式：只分析與提出步驟，不要修改檔案、執行命令或採取外部動作。'
+                options = {'cwd': cwd, 'sandbox': sandbox, 'approvalPolicy': 'on-request',
+                    'developerInstructions': instructions}
                 if data.get('model'):
                     options['model'] = data['model']
                 result = self.bridge.request('thread/start', options)
                 with self.lock:
                     chat = {'id': result['thread']['id'], 'title': prompt[:32], 'cwd': cwd,
-                        'mode': mode, 'messages': [], 'activity': [], 'plan': []}
+                        'mode': mode, 'projectId': self.current_project_id, 'goal': goal,
+                        'messages': [], 'activity': [], 'plan': []}
                     self.chats.insert(0, chat)
                     self.current = chat['id']
                     self.loaded.add(chat['id'])
             elif chat['id'] not in self.loaded:
                 self.bridge.request('thread/resume', {'threadId': chat['id'], 'cwd': cwd,
-                    'sandbox': mode, 'approvalPolicy': 'on-request'})
+                    'sandbox': sandbox, 'approvalPolicy': 'on-request'})
                 self.loaded.add(chat['id'])
             with self.lock:
-                chat['messages'].append({'id': secrets.token_hex(8), 'role': 'user', 'text': prompt})
+                attachments = data.get('attachments', [])
+                if not isinstance(attachments, list) or len(attachments) > 40:
+                    raise ValueError('附件數量超過上限。')
+                input_items = [{'type': 'text', 'text': prompt}]
+                attachment_names = []
+                text_total = 0
+                encoded_total = 0
+                for attachment in attachments:
+                    if not isinstance(attachment, dict):
+                        raise ValueError('附件格式無效。')
+                    name = str(attachment.get('name') or '附件')[:160]
+                    kind = attachment.get('kind')
+                    if kind == 'text':
+                        content = attachment.get('text')
+                        if not isinstance(content, str):
+                            raise ValueError('文字附件格式無效。')
+                        text_total += len(content)
+                        if text_total > 400_000:
+                            raise ValueError('文字附件合計不能超過 40 萬字。')
+                        input_items[0]['text'] += f'\n\n<附加檔案名稱="{name}">\n{content}\n</附加檔案>'
+                    elif kind == 'image':
+                        url = attachment.get('url')
+                        if not isinstance(url, str) or not re.fullmatch(
+                                r'data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+', url):
+                            raise ValueError('圖片附件只支援 PNG、JPEG、WebP 或 GIF。')
+                        encoded_total += len(url)
+                        if encoded_total > 12 * 1024 * 1024:
+                            raise ValueError('圖片附件合計過大，請減少圖片或縮小檔案。')
+                        input_items.append({'type': 'image', 'url': url, 'detail': 'auto'})
+                    else:
+                        raise ValueError('附件只支援常見文字檔與圖片。')
+                    attachment_names.append(name)
+                chat['messages'].append({'id': secrets.token_hex(8), 'role': 'user', 'text': prompt,
+                    'attachments': attachment_names})
                 chat['plan'] = []
                 self.save()
-            self.bridge.request('turn/start', {'threadId': chat['id'], 'input': [{'type': 'text', 'text': prompt}]})
+            self.bridge.request('turn/start', {'threadId': chat['id'], 'input': input_items})
             return {}
         except Exception:
             with self.lock:
@@ -474,6 +625,9 @@ class LocalServer(ThreadingHTTPServer):
         self._file_request = None
         self._file_pending = False
         self._file_result = None
+        self._project_parent_request = None
+        self._project_parent_pending = False
+        self._project_parent_result = None
         super().__init__(('127.0.0.1', port), Handler)
         self.origin = f'http://127.0.0.1:{self.server_port}'
         self.url = self.origin + '/#' + self.token
@@ -500,12 +654,16 @@ class LocalServer(ThreadingHTTPServer):
             self._desktop_connected = False
             self._desktop_request = None
             self._file_request = None
+            self._project_parent_request = None
             if self._file_pending:
                 self._file_pending = False
                 self._file_result = {
                     'status': 'unavailable',
                     'message': '桌面 Mini 已關閉，未開啟任何檔案。',
                 }
+            if self._project_parent_pending:
+                self._project_parent_pending = False
+                self._project_parent_result = {'status': 'unavailable', 'message': '桌面 Mini 已關閉。'}
         self._touch_revision()
 
     def desktop_available(self):
@@ -513,11 +671,13 @@ class LocalServer(ThreadingHTTPServer):
             return self._desktop_connected
 
     def desktop_state(self, role):
-        """Return only owner-safe, path-free desktop companion status."""
+        """Return local companion status only to the authenticated owner."""
         with self._desktop_lock:
             available = self._desktop_connected
             pending = self._file_pending
             result = copy.deepcopy(self._file_result)
+            directory_pending = self._project_parent_pending
+            directory_result = copy.deepcopy(self._project_parent_result)
         if role != 'owner':
             return {'available': False, 'fileAccess': {'available': False}}
         return {
@@ -528,6 +688,11 @@ class LocalServer(ThreadingHTTPServer):
                 'last': result,
                 'message': ('桌面 Mini 尚未啟動；網頁版不能讀取或開啟這台電腦的檔案。'
                             if not available else '只會透過系統檔案選擇器處理你選取的檔案。'),
+            },
+            'directoryPicker': {
+                'available': available,
+                'pending': directory_pending,
+                'last': directory_result,
             },
         }
 
@@ -595,6 +760,38 @@ class LocalServer(ThreadingHTTPServer):
             self._file_result = safe
         self._touch_revision()
 
+    def request_project_parent(self, role):
+        self.assistant.access.require(role, 'projects')
+        with self._desktop_lock:
+            if not self._desktop_connected:
+                raise ValueError('資料夾選擇器需要桌面 Mini；也可以手動輸入已存在的路徑。')
+            if self._project_parent_pending:
+                raise ValueError('目前已有一個資料夾選擇器正在開啟。')
+            request_id = secrets.token_urlsafe(12)
+            self._project_parent_request = {'requestId': request_id}
+            self._project_parent_pending = True
+            self._project_parent_result = {'status': 'waiting', 'requestId': request_id,
+                'message': '正在等待你選擇專案的上層資料夾。'}
+        self._touch_revision()
+        return {'requested': True, 'requestId': request_id}
+
+    def take_project_parent_request(self):
+        with self._desktop_lock:
+            request, self._project_parent_request = self._project_parent_request, None
+            return copy.deepcopy(request)
+
+    def record_project_parent_result(self, request_id, path=None, status='cancelled'):
+        result = {'status': status, 'requestId': str(request_id)[:80]}
+        if isinstance(path, str) and path:
+            result['path'] = path[:1200]
+            result['message'] = '已選擇專案資料夾位置。'
+        else:
+            result['message'] = '未選擇資料夾。'
+        with self._desktop_lock:
+            self._project_parent_pending = False
+            self._project_parent_result = result
+        self._touch_revision()
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
@@ -651,7 +848,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get('Content-Length', 0))
-            if not 0 < length <= 150000:
+            if not 0 < length <= 15 * 1024 * 1024:
                 raise ValueError('要求大小無效')
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
@@ -667,6 +864,8 @@ class Handler(BaseHTTPRequestHandler):
                     data.get('includePreview') is True,
                     role,
                 )
+            elif path == '/api/projects' and data.get('subAction') == 'choose_parent':
+                result = self.server.request_project_parent(role)
             else:
                 result = self.server.assistant.action(path[5:], data, role)
             self.reply(200, result)

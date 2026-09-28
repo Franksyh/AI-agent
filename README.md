@@ -59,11 +59,11 @@ Google OAuth、付費訂閱與真正的雲端聊天紀錄需要在部署平台�
 
 ### 連結 Google 帳號
 
-公開版已支援選用的 Google OAuth 瀏覽器彈出式流程。它只要求 `openid email profile`，用來確認帳號身分；不會要求 Google 密碼、Drive、Gmail 或其他 Google 資料權限，也不會把 access token 傳送或保存到 Mini Codex。
+公開版支援選用的 Google OAuth 瀏覽器流程。Google 帳號連結先要求 `openid email profile`；你也可分別授權 Drive 或 Gmail 的唯讀權限。Drive 列出最近修改的 Google 文件／試算表／簡報，Gmail 列出近 30 天郵件；只有你按「加入訊息」並手動傳送後，所選文字才送到 Mini Codex 規劃 API。Google access token 只存在目前頁面記憶體，不會傳到 Mini Codex 伺服器或寫入瀏覽器儲存。Google 可能要求 OAuth 同意畫面設定及應用程式驗證。
 
 1. 在自己的 Google Cloud 專案建立「Web application」OAuth Client，將下列公開來源加入 Authorized JavaScript origins：`https://future-assistant-jade.vercel.app` 與 `https://franksyh-ai-agent.netlify.app`。
 2. 在 Vercel 與／或 Netlify 的環境變數設定 `GOOGLE_CLIENT_ID`。這是可公開的 OAuth client ID，仍不要提交其他 OAuth 或 API secret。
-3. 重新部署後，開啟「AI 與帳號連結」即可按「連結 Google 帳號」。帳號名稱與 email 只存為目前瀏覽器的顯示資訊；重新整理後若要使用 Google 授權，瀏覽器會自行管理新的工作階段。
+3. 重新部署後，開啟「AI 與帳號連結」按「連結 Google 帳號」。Drive 與 Gmail 讀取權限會在你按相應按鈕時分別詢問。重新整理後，瀏覽器會忘記 access token，若要重新讀取需再次授權。
 
 ## API
 

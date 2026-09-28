@@ -335,8 +335,8 @@ function providerCatalog() {
     return {
       ...provider,
       status: "oauth_ready",
-      capability: "可在這個瀏覽器使用 Google OAuth 確認帳號；Gemini CLI 或 API 仍須由擁有者自行設定。",
-      accountLink: "可連結 Google 帳號。存取權杖只留在瀏覽器記憶體，不會傳送或保存到 Mini Codex 伺服器。",
+      capability: "可在這個瀏覽器選擇讀取 Google Drive 文件與 Gmail 郵件，並將選取內容加入訊息。",
+      accountLink: "採用唯讀權限。Google 存取權杖只留在目前頁面的記憶體，不會傳送到 Mini Codex 伺服器。",
       oauth: googleOAuth,
     };
   });
@@ -350,7 +350,7 @@ function googleOAuthConfig() {
       enabled: true,
       provider: "google",
       clientId,
-      scope: "openid email profile",
+      scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly",
       flow: "browser_popup_token",
       persistence: "瀏覽器工作階段；Mini Codex 不保存 Google access token。",
     }

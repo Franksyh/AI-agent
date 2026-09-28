@@ -244,6 +244,25 @@ class Desktop:
                 'message': f'無法開啟選取的檔案：{str(exc)[:180]}',
             })
 
+    def choose_project_parent(self, request):
+        try:
+            selected = filedialog.askdirectory(
+                parent=self.root,
+                title='選擇建立 Mini Codex 專案的位置',
+                mustexist=True,
+            )
+        except tk.TclError:
+            self.server.record_project_parent_result(request['requestId'], status='failed')
+            return
+        if not selected:
+            self.server.record_project_parent_result(request['requestId'], status='cancelled')
+            return
+        path = Path(selected).resolve(strict=True)
+        if not path.is_dir():
+            self.server.record_project_parent_result(request['requestId'], status='failed')
+            return
+        self.server.record_project_parent_result(request['requestId'], str(path), status='selected')
+
     def tick(self):
         request = self.server.take_desktop_request()
         if request == 'show':
@@ -253,6 +272,9 @@ class Desktop:
         file_request = self.server.take_file_request()
         if file_request:
             self.choose_and_open_file(file_request)
+        project_parent_request = self.server.take_project_parent_request()
+        if project_parent_request:
+            self.choose_project_parent(project_parent_request)
         state = self.server.assistant.state()
         status = ('等待你的核准' if state['approvals'] else '正在處理任務…' if state['busy'] else
                   '連線中／請查看工作台' if not state['ready'] else

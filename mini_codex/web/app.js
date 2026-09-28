@@ -15,8 +15,76 @@ let lastAssistantMessage = '';
 let hasRenderedMessages = false;
 let speechEnabled = localStorage.getItem('mini-speech-output') === 'true';
 let uiScale = Number(localStorage.getItem('mini-ui-scale') || 1);
+let stagedAttachments = [];
+let installPrompt = null;
+let renderedProjectId = undefined;
+let pendingProjectParentRequest = null;
 
 $('cwd').value = localStorage.getItem('mini-cwd') || '';
+
+const TEXT_EXTENSIONS = new Set(['txt','md','markdown','json','csv','tsv','yaml','yml','xml','html','css','js','mjs','cjs','ts','tsx','jsx','py','rs','go','java','c','h','cpp','sh','ps1','toml','ini','sql','log','rb','php','swift','kt','vue','svelte']);
+const IMAGE_TYPES = new Set(['image/png','image/jpeg','image/webp','image/gif']);
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+function renderAttachments() {
+  const area = $('attachment-list');
+  area.replaceChildren(...stagedAttachments.map((file, index) => {
+    const chip = element('div', 'attachment-chip');
+    chip.append(element('span', '', `${file.kind === 'image' ? '▧' : '▤'} ${file.name}`));
+    const remove = element('button', '', '×');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `移除 ${file.name}`);
+    remove.onclick = () => { stagedAttachments.splice(index, 1); renderAttachments(); };
+    chip.append(remove);
+    return chip;
+  }));
+  area.hidden = stagedAttachments.length === 0;
+}
+
+function readDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error(`讀取「${file.name}」失敗。`));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addAttachments(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (files.length + stagedAttachments.length > 40) {
+    showError(new Error('一次最多附加 40 個檔案。'));
+    return;
+  }
+  try {
+    let size = stagedAttachments.reduce((total, item) => total + item.size, 0);
+    const pending = [];
+    for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES || size + file.size > MAX_ATTACHMENT_BYTES) {
+        throw new Error('附件總大小上限為 10 MB；請先縮小檔案或分次傳送。');
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (IMAGE_TYPES.has(file.type)) {
+        pending.push({ name: file.webkitRelativePath || file.name, kind: 'image', url: await readDataUrl(file), size: file.size });
+      } else if (TEXT_EXTENSIONS.has(ext) || file.type.startsWith('text/')) {
+        const text = await file.text();
+        if (text.includes('\u0000')) throw new Error(`「${file.name}」看起來不是文字檔，已略過。`);
+        if (text.length > 120_000) throw new Error(`「${file.name}」超過單檔 12 萬字上限，請先縮小或分段。`);
+        pending.push({ name: file.webkitRelativePath || file.name, kind: 'text', text, size: file.size });
+      } else {
+        throw new Error(`「${file.name}」格式尚未支援。可附加常見程式／文字檔與 PNG、JPEG、WebP、GIF 圖片。`);
+      }
+      size += file.size;
+    }
+    stagedAttachments.push(...pending);
+    renderAttachments();
+    notice = '';
+    $('notice').hidden = true;
+  } catch (error) {
+    showError(error);
+  }
+}
 
 async function api(path, data) {
   const response = await fetch('/api/' + path, {
@@ -263,12 +331,41 @@ function render(s) {
   renderSources(s.sources || []);
   renderAccess(s.access, s.providers);
   renderDesktop(s.desktop);
-  if (!$('cwd').value) $('cwd').value = s.defaultCwd;
-  const cwd = s.chat?.cwd || $('cwd').value;
+  const directoryPicker = s.desktop?.directoryPicker || {};
+  $('choose-project-parent').disabled = directoryPicker.available !== true || directoryPicker.pending === true;
+  $('choose-project-parent').textContent = directoryPicker.pending ? '等待選擇…' : '瀏覽…';
+  if (pendingProjectParentRequest && directoryPicker.last?.requestId === pendingProjectParentRequest) {
+    const last = directoryPicker.last;
+    pendingProjectParentRequest = null;
+    if (last.status === 'selected' && typeof last.path === 'string') {
+      $('project-parent').value = last.path;
+    } else if (last.status === 'failed') {
+      showError(new Error(last.message || '資料夾選擇器無法完成。'));
+    }
+  }
+  if (!s.chat && s.currentProjectId && s.currentProjectId !== renderedProjectId) {
+    $('cwd').value = s.defaultCwd;
+    localStorage.setItem('mini-cwd', s.defaultCwd);
+  } else if (!s.chat && !$('settings').open && !localStorage.getItem('mini-cwd')) {
+    $('cwd').value = s.defaultCwd;
+    localStorage.setItem('mini-cwd', s.defaultCwd);
+  }
+  renderedProjectId = s.currentProjectId || null;
+  const cwd = s.chat?.cwd || $('cwd').value || s.defaultCwd;
   $('project-name').textContent = cwd.split(/[\\/]/).filter(Boolean).pop() || 'AI 工作空間';
   $('project-path').textContent = cwd || '選擇資料夾，開始一起工作';
   $('project-path').title = cwd;
-  if (s.chat) $('mode').value = s.chat.mode;
+  if (s.chat) $('mode').value = s.chat.mode === 'plan' ? 'plan' : s.chat.mode;
+  $('pet-account').textContent = `擁有者：${s.access?.owner || 'Windows 本機帳號'}`;
+  const projects = Array.isArray(s.projects) ? s.projects : [];
+  const projectSelect = $('project-existing');
+  if (projectSelect) {
+    const previousProject = projectSelect.value;
+    projectSelect.replaceChildren(new Option(projects.length ? '選擇專案…' : '尚未建立專案', ''),
+      ...projects.map(project => new Option(`${project.name} · ${project.path}`, project.id)));
+    projectSelect.value = projects.some(project => project.id === previousProject) ? previousProject : (s.currentProjectId || '');
+    $('open-project').disabled = projects.length === 0;
+  }
   if ($('model').options.length !== s.models.length + 1) {
     const previous = $('model').value;
     $('model').replaceChildren(new Option('Codex 預設模型', ''), ...s.models.map(m => new Option(m.name, m.id)));
@@ -292,6 +389,12 @@ function render(s) {
   $('messages').replaceChildren(...messages.map(m => {
     const box = element('article', 'message ' + m.role);
     box.append(element('div', 'role', m.role === 'user' ? 'YOU' : '✦ MINI'), element('div', 'message-body', m.text));
+    if (Array.isArray(m.attachments) && m.attachments.length) {
+      const files = element('div', 'message-files');
+      files.append(element('strong', '', '附件：'));
+      for (const name of m.attachments) files.append(element('span', '', name));
+      box.append(files);
+    }
     return box;
   }));
   if (atBottom) pane.scrollTop = pane.scrollHeight;
@@ -353,12 +456,15 @@ async function poll() {
 $('compose').onsubmit = async (event) => {
   event.preventDefault();
   const text = $('prompt').value.trim();
-  if (!text || sending || state?.busy) return;
+  if ((!text && !stagedAttachments.length) || sending || state?.busy) return;
   sending = true;
   if (state) render(state);
-  const result = await act('send', {text, cwd: $('cwd').value, mode: $('mode').value, model: $('model').value});
+  const attachmentPayload = stagedAttachments.map(({name,kind,text:content,url}) => kind === 'image'
+    ? {name,kind,url}
+    : {name,kind,text:content});
+  const result = await act('send', {text: text || '請先看我附加的檔案與圖片，理解內容後再回覆。', cwd: $('cwd').value, mode: $('mode').value, model: $('model').value, goal: $('goal-text').value || localStorage.getItem('mini-goal') || '', attachments: attachmentPayload});
   sending = false;
-  if (result) $('prompt').value = '';
+  if (result) { $('prompt').value = ''; stagedAttachments = []; renderAttachments(); }
   revision = -1;
   await refresh();
 };
@@ -437,6 +543,126 @@ document.querySelector('.brand').onclick = (event) => {
 $('mobile-new').onclick = () => act('new');
 $('panel-button').onclick = () => document.querySelector('.inspector').classList.toggle('mobile-open');
 $('panel-close').onclick = () => document.querySelector('.inspector').classList.remove('mobile-open');
+
+function openProjectDialog() {
+  $('project-title').value = '';
+  $('project-parent').value = $('cwd').value || state?.defaultCwd || '';
+  $('project-goal').value = localStorage.getItem('mini-goal') || '';
+  $('project-dialog').showModal();
+}
+
+$('new-project').onclick = openProjectDialog;
+$('project-button').onclick = openProjectDialog;
+$('choose-project-parent').onclick = async () => {
+  try {
+    const result = await api('projects', {subAction: 'choose_parent'});
+    pendingProjectParentRequest = result.requestId;
+    await refresh();
+  } catch (error) {
+    showError(error);
+  }
+};
+$('project-form').addEventListener('submit', async (event) => {
+  if (event.submitter?.id !== 'create-project-submit') return;
+  event.preventDefault();
+  const button = $('create-project-submit');
+  button.disabled = true;
+  try {
+    const result = await act('projects', {
+      subAction: 'create',
+      name: $('project-title').value,
+      parent: $('project-parent').value,
+      goal: $('project-goal').value,
+    });
+    if (!result?.project) return;
+    $('cwd').value = result.project.path;
+    localStorage.setItem('mini-cwd', result.project.path);
+    localStorage.setItem('mini-goal', result.project.goal || '');
+    $('project-dialog').close('create');
+    await act('new', {projectId: result.project.id});
+    $('prompt').focus();
+  } finally {
+    button.disabled = false;
+  }
+});
+$('open-project').onclick = async () => {
+  const id = $('project-existing').value;
+  if (!id) return;
+  const result = await act('projects', {subAction: 'select', id});
+  if (!result?.project) return;
+  $('cwd').value = result.project.path;
+  localStorage.setItem('mini-cwd', result.project.path);
+  localStorage.setItem('mini-goal', result.project.goal || '');
+  $('project-dialog').close('open');
+  await act('new', {projectId: result.project.id});
+};
+
+$('goal-button').onclick = () => {
+  $('goal-text').value = state?.chat?.goal || localStorage.getItem('mini-goal') || '';
+  $('goal-dialog').showModal();
+};
+$('goal-dialog').addEventListener('close', async () => {
+  if ($('goal-dialog').returnValue !== 'save') return;
+  const goal = $('goal-text').value.trim();
+  localStorage.setItem('mini-goal', goal);
+  const selectedProject = state?.projects?.find(project => project.id === state.currentProjectId);
+  if (selectedProject) {
+    await act('projects', {subAction: 'goal', id: selectedProject.id, goal});
+  } else {
+    notice = '目標已儲存在此瀏覽器，會套用於新對話。';
+    $('notice').textContent = notice;
+    $('notice').hidden = false;
+  }
+});
+
+$('attach-files').onclick = () => { document.querySelector('.attach-menu').open = false; $('file-picker').click(); };
+$('attach-folder').onclick = () => { document.querySelector('.attach-menu').open = false; $('folder-picker').click(); };
+$('file-picker').onchange = async (event) => { await addAttachments(event.target.files); event.target.value = ''; };
+$('folder-picker').onchange = async (event) => { await addAttachments(event.target.files); event.target.value = ''; };
+
+$('canvas-button').onclick = () => {
+  document.querySelector('.attach-menu').open = false;
+  $('canvas-text').value = localStorage.getItem('mini-canvas') || '';
+  $('canvas-dialog').showModal();
+};
+$('canvas-insert').onclick = () => {
+  const note = $('canvas-text').value.trim();
+  if (note) $('prompt').value += `${$('prompt').value.trim() ? '\n\n' : ''}Canvas 草稿：\n${note}`;
+  $('canvas-dialog').close('insert');
+  $('prompt').focus();
+};
+$('canvas-dialog').addEventListener('close', () => {
+  if ($('canvas-dialog').returnValue === 'save') localStorage.setItem('mini-canvas', $('canvas-text').value);
+});
+
+$('pet-menu-button').onclick = () => {
+  const opening = $('pet-actions').hidden;
+  $('pet-actions').hidden = !opening;
+  $('pet-menu-button').setAttribute('aria-expanded', String(opening));
+};
+$('hide-mini-menu').onclick = () => act('desktop', {action: 'hide'});
+$('pet-settings').onclick = () => $('settings').showModal();
+$('logout').onclick = async () => {
+  if (!confirm('要登出這台電腦上的 Codex CLI 帳號嗎？這也會影響其他使用同一個 Codex 帳號的本機工具。')) return;
+  await act('logout');
+};
+
+$('install-app').onclick = async () => {
+  if (!installPrompt) { $('install-dialog').showModal(); return; }
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $('install-app').textContent = '安裝說明';
+};
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  $('install-app').textContent = '安裝 App ↗';
+});
+window.addEventListener('appinstalled', () => { installPrompt = null; $('install-app').textContent = '已安裝'; });
+if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) {
+  $('install-app').textContent = '已安裝';
+}
 
 setUiScale(Number.isFinite(uiScale) ? uiScale : 1);
 setSpeechOutput(speechEnabled);

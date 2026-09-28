@@ -8,8 +8,8 @@ import secrets
 
 
 OWNER_ACTIONS = frozenset({
-    "send", "stop", "new", "select", "approve", "login", "settings",
-    "sources", "import", "desktop", "files",
+    "send", "stop", "new", "select", "approve", "login", "logout", "settings",
+    "sources", "import", "desktop", "files", "projects",
 })
 # The local server deliberately does not issue member work sessions yet.
 # A future hosted pairing flow needs per-member history and an identity

@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "mini-codex-cloud-shell-v3";
+const CACHE_NAME = "mini-codex-cloud-shell-v4";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -7,6 +7,10 @@ const APP_SHELL = [
   "/mini-codex-cloud.js",
   "/manifest.webmanifest",
   "/assets/mini-robot.svg",
+  "/assets/mini-robot-192.png",
+  "/assets/mini-robot-512.png",
+  "/assets/apple-touch-icon.png",
+  "/privacy.html",
 ];
 
 self.addEventListener("install", (event) => {

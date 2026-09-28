@@ -2,7 +2,7 @@
 {
   "name": "Mini Codex",
   "short_name": "Mini Codex",
-  "description": "安全的公開 AI 工作台；本機 Mini Codex 保留檔案、對話與電腦操作的擁有者核准。",
+  "description": "可安裝於手機與電腦的繁體中文 AI 工作台；本機 Mini Codex 保留檔案、對話與電腦操作的擁有者核准。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -13,9 +13,15 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/assets/mini-robot.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/assets/mini-robot-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/mini-robot-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
