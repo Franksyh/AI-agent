@@ -69,6 +69,8 @@ Google OAuth、付費訂閱與真正的雲端聊天紀錄需要在部署平台�
 2. 在 Vercel 與／或 Netlify 的環境變數設定 `GOOGLE_CLIENT_ID`。這是可公開的 OAuth client ID，仍不要提交其他 OAuth 或 API secret。
 3. 重新部署後，開啟「AI 與帳號連結」按「連結 Google 帳號」。Drive 與 Gmail 讀取權限會在你按相應按鈕時分別詢問。重新整理後，瀏覽器會忘記 access token，若要重新讀取需再次授權。
 
+第一次建立 Google OAuth 專案可依照[完整設定步驟](docs/google-oauth-setup-zh-hant.md)操作；提供設定時只需要 Client ID，不要提供 Client Secret。
+
 ## API
 
 兩個部署平台提供相同的公開端點：
