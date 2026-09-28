@@ -7,8 +7,9 @@
 - Vercel：<https://future-assistant-jade.vercel.app>
 - Netlify 備援：<https://franksyh-ai-agent.netlify.app>
 - GitHub：<https://github.com/Franksyh/AI-agent>
+- Windows 桌面版：<https://github.com/Franksyh/AI-agent/releases/latest>
 - 公開版支援手機／桌面 PWA 安裝、響應式 Codex 風格工作區、對話、語音文字、縮放、隱藏 Mini 與開源來源更新。
-- Windows ZIP：<https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip>；本機版透過 Codex App Server 工作，讀取或編輯電腦檔案由擁有者在本機核准。
+- Windows 桌面版提供免 Python 的可攜 ZIP：<https://github.com/Franksyh/AI-agent/releases/latest/download/MiniCodex-Windows.zip>。仍需使用者自行安裝並登入官方 Codex CLI；本機版透過 Codex App Server 工作，讀取或編輯電腦檔案由擁有者在本機核准。
 - 已驗證 Vercel 與 Netlify 公開頁、隱私頁、API、安裝圖示可回應，且現有 15 項 Python 測試通過。
 
 ## 第 2 階段：帳號與 AI 服務串接 — 部分完成
@@ -24,9 +25,9 @@
 - 需先選定會員權益、價格、退款／服務條款和收款商；若使用綠界 ECPay，還需商家帳號及測試環境資料。
 - 實作需包含伺服器端建立訂單、驗證付款回呼、持久化會員狀態及權限檢查；不能只依瀏覽器回報「已付款」。
 
-## 第 4 階段：手機與桌面安裝包 — 部分完成
+## 第 4 階段：手機與桌面安裝包 — PWA 與 Windows 可攜版完成，商店套件未完成
 
-- 現在可直接安裝 PWA；Windows 本機伴侶程式可下載 ZIP 後執行啟動檔。
+- 現在可直接安裝 PWA；Windows 本機伴侶程式可從 GitHub Release 下載免 Python ZIP，解壓後執行 `Start-Mini-Codex.cmd` 或 `MiniCodex.exe`。
 - Android AAB、Windows MSIX 與原生 iOS 專案尚未生成／送審。需設定應用程式識別碼、簽章和各商店開發者帳號；iOS 原生簽署建置需 macOS／Xcode。
 
 ## 第 5 階段：商店與正式營運 — 尚未開始
