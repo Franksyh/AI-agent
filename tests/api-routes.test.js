@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import googleOAuthStatus from "../api/auth/google.js";
 import handler from "../api/[...route].js";
 
 function createResponse() {
@@ -35,4 +36,20 @@ test("Vercel catch-all keeps nested Google OAuth route segments", async () => {
   const body = JSON.parse(response.body);
   assert.equal(body.ok, true);
   assert.equal(body.googleOAuth.enabled, false);
+});
+
+test("explicit Vercel Google OAuth status endpoint is reachable without credentials", async () => {
+  const response = createResponse();
+  await googleOAuthStatus({
+    method: "GET",
+    headers: { "x-vercel-id": "test-request" },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  const body = JSON.parse(response.body);
+  assert.equal(body.requestId, "test-request");
+  assert.deepEqual(body.googleOAuth, {
+    enabled: false,
+    reason: "尚未在部署平台設定 GOOGLE_CLIENT_ID。",
+  });
 });
