@@ -34,6 +34,9 @@ jobs:
       - name: Check JavaScript syntax
         run: npm run check
 
+      - name: Check Windows companion JavaScript syntax
+        run: node --check mini_codex/web/app.js
+
       - name: Compile Python modules
         run: python -m py_compile mini_codex/access.py mini_codex/bridge.py mini_codex/desktop.py mini_codex/server.py mini_codex/sources.py
 
