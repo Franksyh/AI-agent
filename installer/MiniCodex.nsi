@@ -4,7 +4,6 @@ SetCompressor /SOLID zlib
 SetDateSave on
 SetOverwrite on
 CRCCheck force
-SetShellVarContext current
 
 !include "MUI2.nsh"
 
@@ -43,6 +42,7 @@ VIAddVersionKey "FileDescription" "${APP_NAME} Windows installer"
 
 Section "Mini Codex（必要檔案）" MainSection
   SectionIn RO
+  SetShellVarContext current
   SetOutPath "$INSTDIR"
   File /r "dist\MiniCodex\*"
 
@@ -66,6 +66,7 @@ Section /o "建立桌面捷徑" DesktopSection
 SectionEnd
 
 Section "Uninstall"
+  SetShellVarContext current
   Delete "$SMPROGRAMS\Mini Codex\Mini Codex.lnk"
   Delete "$SMPROGRAMS\Mini Codex\解除安裝 Mini Codex.lnk"
   RMDir "$SMPROGRAMS\Mini Codex"
