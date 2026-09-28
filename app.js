@@ -748,20 +748,35 @@ function setupPwa() {
   }
 
   const installButton = $("#install-app");
+  const installDialog = $("#install-dialog");
+  const nativeInstallButton = $("#install-pwa-now");
   if (installButton) {
     const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
     installButton.hidden = Boolean(standalone);
-    installButton.addEventListener("click", installApp);
+    installButton.addEventListener("click", () => {
+      if (installDialog && !installDialog.open) installDialog.showModal();
+    });
+  }
+  if (nativeInstallButton) {
+    nativeInstallButton.hidden = !state.installPrompt;
+    nativeInstallButton.addEventListener("click", async () => {
+      installDialog?.close();
+      await installApp();
+    });
   }
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     state.installPrompt = event;
-    if (installButton) installButton.hidden = false;
+    if (nativeInstallButton) nativeInstallButton.hidden = false;
+    if (installButton && !(window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone)) {
+      installButton.hidden = false;
+    }
   });
 
   window.addEventListener("appinstalled", () => {
     state.installPrompt = null;
+    if (nativeInstallButton) nativeInstallButton.hidden = true;
     if (installButton) installButton.hidden = true;
     addMessage("system", "Future Assistant 已安裝完成，之後可從手機或電腦桌面直接開啟。");
   });
@@ -773,6 +788,8 @@ async function installApp() {
     state.installPrompt = null;
     promptEvent.prompt();
     const choice = await promptEvent.userChoice.catch(() => null);
+    const nativeInstallButton = $("#install-pwa-now");
+    if (nativeInstallButton) nativeInstallButton.hidden = true;
     if (choice?.outcome === "accepted") {
       addMessage("system", "安裝已開始。完成後可像 App 一樣從裝置桌面開啟。");
     }
