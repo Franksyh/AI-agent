@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import sys
 import threading
 import time
 import re
@@ -21,7 +22,11 @@ from access import AccessPolicy
 from bridge import CodexBridge
 from sources import SourceManager
 
-ROOT = Path(__file__).resolve().parent
+FROZEN = bool(getattr(sys, 'frozen', False))
+ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) if FROZEN else Path(__file__).resolve().parent
+DEFAULT_CWD = (Path.home() / 'Documents') if FROZEN else ROOT.parent
+if FROZEN and not DEFAULT_CWD.is_dir():
+    DEFAULT_CWD = Path.home()
 DATA = Path(os.environ.get('MINI_CODEX_DATA', str(Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MiniCodex')))
 
 
@@ -208,7 +213,7 @@ class Assistant:
                 'chat': self.chat() if is_owner else None,
                 'approvals': list(self.approvals.values()) if is_owner else [],
                 'revision': self.revision,
-                'defaultCwd': ((self._project(self.current_project_id) or {}).get('path') or str(ROOT.parent)) if is_owner else '',
+                'defaultCwd': ((self._project(self.current_project_id) or {}).get('path') or str(DEFAULT_CWD)) if is_owner else '',
                 'projects': copy.deepcopy(self.projects) if is_owner else [],
                 'currentProjectId': self.current_project_id if is_owner else None,
                 'sources': self.sources.list() if is_owner else [],
@@ -266,7 +271,7 @@ class Assistant:
                     preview = summary.get('preview', 'Codex 對話')
                     title = str(preview)[:32] or 'Codex 對話'
                 cwd = thread.get('cwd')
-                additions.append({'id': thread_id, 'title': title, 'cwd': cwd if isinstance(cwd, str) else str(ROOT.parent),
+                additions.append({'id': thread_id, 'title': title, 'cwd': cwd if isinstance(cwd, str) else str(DEFAULT_CWD),
                     'mode': 'read-only', 'messages': messages, 'activity': [], 'plan': [], 'source': 'codex-import'})
             except (RuntimeError, TimeoutError, OSError, ValueError, KeyError, TypeError):
                 # One unreadable historical thread must not leave earlier
@@ -521,7 +526,7 @@ class Assistant:
             if self.busy:
                 raise ValueError('目前任務仍在執行')
             chat = self.chat()
-            cwd = str(Path(chat['cwd'] if chat else data.get('cwd', str(ROOT.parent))).resolve())
+            cwd = str(Path(chat['cwd'] if chat else data.get('cwd', str(DEFAULT_CWD))).resolve())
             if not Path(cwd).is_dir():
                 raise ValueError('專案資料夾不存在')
             mode = chat['mode'] if chat else data.get('mode', 'read-only')

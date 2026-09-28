@@ -4,7 +4,7 @@
 Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手機 PWA 與擁有者的 Windows 本機伴侶程式。
 
 - **公開工作台**：規劃任務、閱讀受信任開源來源、顯示服務狀態、語音輸入、文字朗讀、介面縮放、手機版與 PWA。
-- **Windows Mini**：透過本機 Codex App Server 顯示真正的 Codex 對話、匯入既有 thread、讀取與修改專案、審查開源更新、用原生檔案選擇器開啟你選取的電腦檔案，以及在每次需要時核准工具操作。
+- **Windows Mini**：透過本機 Codex App Server 顯示真正的 Codex 對話、匯入既有 thread、讀取與修改專案、審查開源更新、用原生檔案選擇器開啟你選取的電腦檔案，以及在每次需要時核准工具操作。Windows 可下載免 Python 的桌面包（仍需自行安裝並登入官方 Codex）。
 - **安全邊界**：公開網頁永遠無法直接讀取你的檔案、匯入 Codex 對話、使用憑證或控制電腦。這些能力只在 `127.0.0.1` 的本機 Mini，且由擁有者核准。
 
 ## 公開連結
@@ -15,6 +15,7 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 - Netlify：<https://franksyh-ai-agent.netlify.app>
 - GitHub：<https://github.com/Franksyh/AI-agent>
 - Windows 本機 Mini ZIP：<https://github.com/Franksyh/AI-agent/archive/refs/heads/main.zip>
+- Windows 桌面可下載版：<https://github.com/Franksyh/AI-agent/releases/latest>（發佈版建置完成後提供）
 
 分階段功能與仍需的帳號設定請見[執行表](docs/roadmap-zh-hant.md)。
 
@@ -44,7 +45,7 @@ Mini Codex 是一個繁體中文的 AI 工作台，分成公開的網頁／手�
 7. 工作模式預設是唯讀或工作區修改。擁有者可選擇全機協助模式，但每次工具與高風險操作仍由 Codex 的核准流程處理。
 8. `選擇並開啟檔案` 只會在桌面 Mini 顯示 Windows 原生檔案選擇器。瀏覽器不會傳送檔案路徑；只有你親自選取的一般檔案才會交給預設應用程式開啟。文字預覽為選用、受限長度的本機顯示，不會自動傳給 AI。
 
-需要 Python 3.10+、Tcl/Tk（桌面 Mini）與已安裝、已登入的 Codex CLI。Mini 不讀取或儲存 OpenAI 帳號憑證。
+原始碼方式需要 Python 3.10+、Tcl/Tk（桌面 Mini）與已安裝、已登入的官方 Codex CLI。Windows 發佈包內含 Mini 所需的 Python 執行環境，不需另外安裝 Python；仍須自行安裝並登入官方 Codex CLI。Mini 不讀取或儲存 OpenAI 帳號憑證。此下載包為免安裝資料夾，尚未簽署，也不是 Microsoft Store 安裝套件。
 
 詳細本機使用方式：[mini_codex/README.md](mini_codex/README.md)。
 

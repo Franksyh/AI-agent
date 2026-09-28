@@ -1,0 +1,101 @@
+name: Mini Codex Windows package
+
+on:
+  push:
+    branches: [main]
+    tags: [desktop-v*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build portable Windows desktop package
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install packager
+        run: python -m pip install --disable-pip-version-check PyInstaller==6.20.0
+
+      - name: Build desktop application
+        run: >-
+          python -m PyInstaller --noconfirm --clean --windowed --onedir
+          --name MiniCodex
+          --add-data "mini_codex/web;web"
+          --distpath dist --workpath build/work --specpath build
+          mini_codex/desktop.py
+
+      - name: Assemble and verify portable folder
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $PWD "dist/MiniCodex"
+          $required = @(
+            "MiniCodex.exe",
+            "_internal/web/index.html",
+            "_internal/web/app.js",
+            "_internal/web/style.css",
+            "_internal/web/robot.svg"
+          )
+          foreach ($item in $required) {
+            $path = Join-Path $bundle $item
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Windows package is missing $item"
+            }
+          }
+          Copy-Item -LiteralPath "Start-Mini-Codex.cmd" -Destination $bundle
+          @"
+          Mini Codex for Windows
+
+          1. Extract this folder.
+          2. Run Start-Mini-Codex.cmd or MiniCodex.exe.
+          3. Install and sign in to the official Codex CLI separately.
+
+          The Codex CLI is not included. Mini Codex stores its local data in
+          %LOCALAPPDATA%\MiniCodex and only listens on this computer.
+          This portable package is unsigned and is not a Microsoft Store installer.
+          "@ | Set-Content -LiteralPath (Join-Path $bundle "README.txt") -Encoding utf8
+          Compress-Archive -Path (Join-Path $bundle "*") -DestinationPath "dist/MiniCodex-Windows.zip" -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath "dist/MiniCodex-Windows.zip" -PathType Leaf)) {
+            throw "Windows ZIP was not created"
+          }
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v7
+        with:
+          name: MiniCodex-Windows
+          path: dist/MiniCodex-Windows.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish tagged Windows package
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: package
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows package
+        uses: actions/download-artifact@v7
+        with:
+          name: MiniCodex-Windows
+          path: release
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "release/MiniCodex-Windows.zip" `
+            --verify-tag `
+            --title "Mini Codex Windows $env:GITHUB_REF_NAME" `
+            --notes "Portable Windows desktop package. Extract the ZIP and run Start-Mini-Codex.cmd. Python is bundled. Install and sign in to the official Codex CLI separately; it is not included. This package is unsigned and is not a Microsoft Store installer."

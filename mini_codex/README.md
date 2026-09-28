@@ -7,7 +7,8 @@
 在專案根目錄雙擊 `Start-Mini-Codex.cmd`，開啟桌面工作台與機器人。
 雙擊 `Start-Mini-Web.cmd`，單獨啟動瀏覽器版。
 
-需要 Python 3.10 以上（桌面機器人需 Tcl/Tk）與 Codex 執行檔。沒有額外 Python 套件。
+Windows 發佈版可解壓後直接執行 `MiniCodex.exe`，不需要另外安裝 Python。從原始碼啟動才需要 Python 3.10 以上（桌面機器人需 Tcl/Tk）；沒有額外 Python 套件。
+兩種方式都需要你自行安裝並登入官方 Codex CLI；發佈包不包含、也不重新散佈 Codex 執行檔。
 桌面工作台使用 Microsoft Edge 的獨立應用程式視窗；找不到 Edge 時會使用預設瀏覽器。
 程式優先使用 PATH 中的 codex.exe，再尋找 Windows Codex 安裝目錄。
 其他位置可設定 `MINI_CODEX_BIN` 為執行檔的完整路徑。
