@@ -26,12 +26,14 @@ jobs:
         run: python -m pip install --disable-pip-version-check PyInstaller==6.20.0
 
       - name: Build desktop application
-        run: >-
-          python -m PyInstaller --noconfirm --clean --windowed --onedir
-          --name MiniCodex
-          --add-data "mini_codex/web;web"
-          --distpath dist --workpath build/work --specpath build
-          mini_codex/desktop.py
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          python -m PyInstaller --noconfirm --clean --windowed --onedir `
+            --name MiniCodex `
+            --add-data "$root\mini_codex\web;web" `
+            --distpath "$root\dist" --workpath "$root\build\work" --specpath "$root\build" `
+            "$root\mini_codex\desktop.py"
 
       - name: Assemble and verify portable folder
         shell: pwsh
