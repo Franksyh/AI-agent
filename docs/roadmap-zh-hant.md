@@ -15,7 +15,8 @@
 ## 第 2 階段：帳號與 AI 服務串接 — 部分完成
 
 - Google OAuth 與 Drive／Gmail 唯讀匯入流程已寫好；正式部署尚未設定 `GOOGLE_CLIENT_ID`，因此目前顯示未設定。完成 Google Cloud Web OAuth 用戶端與同意畫面後，才可啟用。
-- 公開雲端版沒有已登入的產品擁有者帳號；雲端標示「訪客」代表公開網站權限，不會改變 Windows 本機 Mini 的擁有者角色。正式管理者登入仍待 OAuth Client ID、擁有者帳號識別與伺服器端授權驗證。
+- Google 網站擁有者登入已完成程式實作：後端驗證 Google ID token、client audience、email allowlist 與到期時間，並以短期 Secure／HttpOnly Cookie 保持登入。Vercel 與 Netlify 目前都尚未設定 `GOOGLE_CLIENT_ID` 和 `OWNER_GOOGLE_EMAIL`，所以使用者仍會看到「雲端訪客」。
+- 擁有者登入目前只辨識網站帳號，不代表已完成雲端管理功能，也不授予 Windows 電腦權限；Windows 檔案和工具操作仍須由擁有者自己的本機 Mini 執行。
 - 開源來源目前更新 GitHub 公開中繼資料；分數不是 AI 程式碼審查。Windows 本機版可透過使用者已登入的 Codex 做唯讀程式審查。
 - Gemini、Perplexity、ChatGPT API、Siri／Apple Intelligence 目前不是可互換的完整雲端代理。下一步要逐一使用官方 API 或官方 CLI、完成憑證設定與能力測試，再做模型選擇與回退。
 - 一般使用者的公開聊天目前以規則式工作規劃為主，尚未連上雲端大型語言模型。
@@ -26,9 +27,10 @@
 - 需先選定會員權益、價格、退款／服務條款和收款商；若使用綠界 ECPay，還需商家帳號及測試環境資料。
 - 實作需包含伺服器端建立訂單、驗證付款回呼、持久化會員狀態及權限檢查；不能只依瀏覽器回報「已付款」。
 
-## 第 4 階段：手機與桌面安裝包 — PWA 與 Windows 可攜版完成，商店套件未完成
+## 第 4 階段：手機與桌面安裝包 — PWA 與 Windows 可攜版完成，Windows Setup 建置中
 
 - 現在可直接安裝 PWA；Windows 本機伴侶程式可從 GitHub Release 下載免 Python ZIP，解壓後執行 `Start-Mini-Codex.cmd` 或 `MiniCodex.exe`。
+- per-user Windows Setup 安裝程式、開始功能表捷徑、解除安裝項目和 Windows CI 冒煙測試已完成；CI 已在 Windows runner 實際安裝、啟動、解除安裝成功。Setup 尚未放入公開 Release；下一步發布 `desktop-v0.1.2`。
 - Android AAB、Windows MSIX 與原生 iOS 專案尚未生成／送審。需設定應用程式識別碼、簽章和各商店開發者帳號；iOS 原生簽署建置需 macOS／Xcode。
 
 ## 第 5 階段：商店與正式營運 — 尚未開始
@@ -39,7 +41,7 @@
 
 ## 需要營運者在自己的平台完成的設定
 
-1. Google Cloud：建立 Web OAuth Client，加入正式網站來源，並在 Vercel／Netlify 設定 `GOOGLE_CLIENT_ID`。
+1. Google Cloud：建立 Web OAuth Client，加入正式網站來源，並在 Vercel／Netlify 分別設定 `GOOGLE_CLIENT_ID` 與 `OWNER_GOOGLE_EMAIL`。
 2. AI 服務：依選用的官方服務，在部署平台祕密環境變數設定 API 金鑰；不可把金鑰提交 GitHub 或貼在聊天。
 3. 會員付款：決定方案、價格與付款商，申請商家帳號並以沙箱資料測試。
 4. 商店發布：準備 Microsoft Partner Center、Google Play Console 與 Apple Developer 帳號及產品資料。
