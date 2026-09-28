@@ -83,8 +83,8 @@ const PROVIDER_CATALOG = Object.freeze([
     id: "github",
     name: "GitHub",
     status: "public_metadata_only",
-    capability: "來源端點只讀取受信任儲存庫的公開中繼資料。",
-    accountLink: "GitHub 帳號授權尚未在此公開服務設定。",
+    capability: "可搜尋 GitHub 公開儲存庫並讀取受信任來源中繼資料；不存取私有儲存庫。",
+    accountLink: "尚未連結 GitHub 帳號；目前僅使用公開 API。",
   },
   {
     id: "gemini",

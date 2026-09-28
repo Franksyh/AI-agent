@@ -148,6 +148,15 @@ dialog::backdrop { background: #17203745; backdrop-filter: blur(3px); }
 .dialog-heading button { border: 0; background: transparent; color: #9aa2ae; font-size: 24px; }
 .dialog-card > p { color: #7e8999; line-height: 1.8; font-size: 11px; }
 .source-list, .provider-list { display: grid; gap: 9px; }
+.source-search { display: flex; gap: 8px; margin: 15px 0 8px; }
+.source-search input { min-width: 0; flex: 1; padding: 10px 11px; border: 1px solid #dbe1ea; border-radius: 8px; color: #4e5969; background: #fff; font: inherit; font-size: 11px; }
+.source-search button { flex: none; padding: 9px 12px; border: 0; border-radius: 8px; color: #fff; background: var(--accent); font-size: 10px; }
+.source-search button:disabled { opacity: .55; cursor: wait; }
+.source-search-status { margin: 8px 0; color: #7e8999; line-height: 1.6; font-size: 10px; }
+.source-search-results { display: grid; gap: 8px; }
+.search-result-card .source-card-head > a { color: var(--accent-ink); font-size: 12px; font-weight: 650; }
+.search-result-card > small { display: block; margin-top: 6px; color: #8993a1; line-height: 1.55; font-size: 10px; }
+.source-section-heading { margin: 21px 0 9px; color: #596575; font-size: 11px; }
 .source-card, .provider-card { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .source-card-head, .provider-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .source-card strong, .provider-card strong { display: block; font-size: 12px; }

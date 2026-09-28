@@ -168,6 +168,120 @@ function sourceScore(source) {
   return "待審查";
 }
 
+function githubRepositoryUrl(repository) {
+  try {
+    const url = new URL(repository?.html_url || "");
+    if (url.protocol !== "https:" || url.hostname !== "github.com" || !/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/.test(url.pathname)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function renderGitHubSearchResults(repositories) {
+  const results = $("github-search-results");
+  const cards = repositories.map((repository) => {
+    const url = githubRepositoryUrl(repository);
+    if (!url) return null;
+    const card = document.createElement("article");
+    card.className = "source-card search-result-card";
+    const head = document.createElement("div");
+    head.className = "source-card-head";
+    const name = document.createElement("a");
+    name.href = url;
+    name.target = "_blank";
+    name.rel = "noreferrer";
+    name.textContent = safeText(repository.full_name, "GitHub 專案");
+    const score = document.createElement("span");
+    score.className = "source-score";
+    score.textContent = repository.archived ? "已封存" : repository.fork ? "Fork" : "公開專案";
+    head.append(name, score);
+
+    const description = document.createElement("small");
+    description.textContent = safeText(repository.description, "此專案沒有提供說明。");
+    const metadata = document.createElement("small");
+    const values = [
+      safeText(repository.language, "未標示語言"),
+      safeText(repository.license?.spdx_id, "未標示授權"),
+      `★ ${Number(repository.stargazers_count || 0).toLocaleString("zh-TW")}`,
+      repository.pushed_at ? `最近更新 ${formatDate(repository.pushed_at)}` : "更新時間未知",
+    ];
+    metadata.className = "source-signals";
+    metadata.textContent = values.join(" · ");
+
+    const links = document.createElement("div");
+    links.className = "source-links";
+    const notice = document.createElement("span");
+    notice.textContent = "公開中繼資料 · 尚未進行程式碼審查";
+    const open = document.createElement("a");
+    open.href = url;
+    open.target = "_blank";
+    open.rel = "noreferrer";
+    open.textContent = "開啟專案 ↗";
+    links.append(notice, open);
+    card.append(head, description, metadata, links);
+    return card;
+  }).filter(Boolean);
+  results.replaceChildren(...cards);
+  return cards.length;
+}
+
+async function searchGitHubRepositories() {
+  const input = $("github-search-query");
+  const button = $("github-search-button");
+  const status = $("github-search-status");
+  if (button.disabled) return;
+  const query = input.value.trim().replace(/\s+/g, " ");
+  status.hidden = false;
+  if (query.length < 2) {
+    status.textContent = "請輸入至少 2 個字元。";
+    input.focus();
+    return;
+  }
+  if (query.length > 100) {
+    status.textContent = "搜尋文字最多 100 個字元。";
+    return;
+  }
+
+  const results = $("github-search-results");
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "搜尋中…";
+  status.textContent = "正在向 GitHub 搜尋公開儲存庫…";
+  results.replaceChildren();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  try {
+    const parameters = new URLSearchParams({ q: `${query} is:public`, sort: "stars", order: "desc", per_page: "12" });
+    const response = await fetch(`https://api.github.com/search/repositories?${parameters}`, {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: controller.signal,
+    });
+    if (response.status === 403 || response.status === 429) {
+      throw new Error("GitHub 公開搜尋目前達到速率限制，請稍後再試，或直接到 GitHub 搜尋。");
+    }
+    if (!response.ok) throw new Error("GitHub 搜尋暫時無法使用，請稍後再試。");
+    const payload = await response.json();
+    const repositories = Array.isArray(payload.items) ? payload.items.filter((item) => item && item.private !== true) : [];
+    const count = renderGitHubSearchResults(repositories);
+    const total = Number(payload.total_count || 0);
+    const limitHeader = response.headers.get("x-ratelimit-remaining");
+    const limitRemaining = limitHeader === null ? null : Number(limitHeader);
+    const rateNote = Number.isFinite(limitRemaining) && limitRemaining <= 1 ? " GitHub 搜尋額度即將用完，請稍後再搜尋。" : "";
+    status.textContent = total
+      ? `找到 ${total.toLocaleString("zh-TW")} 個公開專案，顯示前 ${count} 個；Star、授權和更新時間只能作為參考。${rateNote}`
+      : "找不到符合條件的公開專案。";
+  } catch (error) {
+    status.textContent = error?.name === "AbortError"
+      ? "GitHub 搜尋逾時，請確認網路後重試。"
+      : error?.message || "GitHub 搜尋失敗，請稍後重試。";
+  } finally {
+    window.clearTimeout(timeout);
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
 function renderSources() {
   const sources = state.sources;
   const baseSummary = sources.length
@@ -746,6 +860,13 @@ function wire() {
   $("close-history").addEventListener("click", closeMobilePanels);
   $("close-inspector").addEventListener("click", closeMobilePanels);
   $("sources-button").addEventListener("click", () => $("sources-dialog").showModal());
+  $("github-search-button").addEventListener("click", searchGitHubRepositories);
+  $("github-search-query").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      searchGitHubRepositories();
+    }
+  });
   $("providers-button").addEventListener("click", () => $("providers-dialog").showModal());
   $("refresh-sources").addEventListener("click", async () => {
     const button = $("refresh-sources");

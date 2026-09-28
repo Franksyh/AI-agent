@@ -17,7 +17,7 @@
 - Google OAuth 與 Drive／Gmail 唯讀匯入流程已寫好；正式部署尚未設定 `GOOGLE_CLIENT_ID`，因此目前顯示未設定。完成 Google Cloud Web OAuth 用戶端與同意畫面後，才可啟用。
 - Google 網站擁有者登入已完成程式實作：後端驗證 Google ID token、client audience、email allowlist 與到期時間，並以短期 Secure／HttpOnly Cookie 保持登入。Vercel 與 Netlify 目前都尚未設定 `GOOGLE_CLIENT_ID` 和 `OWNER_GOOGLE_EMAIL`，所以使用者仍會看到「雲端訪客」。
 - 擁有者登入目前只辨識網站帳號，不代表已完成雲端管理功能，也不授予 Windows 電腦權限；Windows 檔案和工具操作仍須由擁有者自己的本機 Mini 執行。
-- 開源來源目前更新 GitHub 公開中繼資料；分數不是 AI 程式碼審查。Windows 本機版可透過使用者已登入的 Codex 做唯讀程式審查。
+- 開源來源可搜尋 GitHub 公開儲存庫並更新受信任來源的授權、維護、封存與社群中繼資料；資料只供快速篩選，不是 AI 程式碼審查。Windows 本機版可透過使用者已登入的 Codex 做唯讀程式審查。
 - Gemini、Perplexity、ChatGPT API、Siri／Apple Intelligence 目前不是可互換的完整雲端代理。下一步要逐一使用官方 API 或官方 CLI、完成憑證設定與能力測試，再做模型選擇與回退。
 - 一般使用者的公開聊天目前以規則式工作規劃為主，尚未連上雲端大型語言模型。
 
