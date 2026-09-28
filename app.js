@@ -747,7 +747,7 @@ function setupPwa() {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
-  const installButton = $("#installApp");
+  const installButton = $("#install-app");
   if (installButton) {
     const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
     installButton.hidden = Boolean(standalone);
@@ -779,11 +779,8 @@ async function installApp() {
     return;
   }
 
-  routeTo("guide");
-  addMessage(
-    "system",
-    "此裝置可使用瀏覽器選單的加入主畫面或安裝功能。本站已加入 PWA manifest 與離線快取，手機、電腦與網頁可使用同一個入口。",
-  );
+  const installDialog = $("#install-dialog");
+  if (installDialog && !installDialog.open) installDialog.showModal();
 }
 
 function setupEvents() {
