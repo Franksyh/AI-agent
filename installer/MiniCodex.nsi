@@ -21,8 +21,6 @@ InstallDir "$LOCALAPPDATA\Programs\Mini Codex"
 InstallDirRegKey HKCU "${APP_UNINSTALL_KEY}" "InstallLocation"
 ShowInstDetails show
 ShowUnInstDetails show
-UninstallDisplayName "${APP_NAME}"
-UninstallDisplayIcon "$INSTDIR\${APP_EXE}"
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
